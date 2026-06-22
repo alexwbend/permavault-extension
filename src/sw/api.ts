@@ -463,6 +463,7 @@ class CountingStream {
   }
 
   transformStream() {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
     const counterStream = this;
 
     return new TransformStream({
