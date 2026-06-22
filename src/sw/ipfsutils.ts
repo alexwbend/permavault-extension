@@ -35,6 +35,7 @@ type MetadataWithIPFS = CollMetadata & {
   ipfsPins?: { url: string; cid: string }[] | null;
 };
 
+// eslint-disable-next-line @typescript-eslint/require-await
 export async function setAutoIPFSUrl(url: string) {
   if (autoipfsOpts.daemonURL !== url) {
     autoipfs = null;
