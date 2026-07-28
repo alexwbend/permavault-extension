@@ -1,6 +1,6 @@
 {
-  "name": "Webrecorder ArchiveWeb.page",
-  "description": "Create high-fidelity web archives directly in your browser",
+  "name": "Permavault",
+  "description": "Archive web pages permanently, directly from your browser",
   "version": "$VERSION",
   "permissions": [
     "debugger",
@@ -11,7 +11,9 @@
     "unlimitedStorage",
     "webRequest"
   ],
-  "content_security_policy": "script-src 'self' 'unsafe-eval'; object-src 'self'",
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
   "background": {
     "service_worker": "bg.js"
   },
@@ -23,18 +25,21 @@
     "default_icon": {
       "32": "$ICON"
     },
-    "default_title": "Webrecorder ArchiveWeb.page",
+    "default_title": "Permavault",
     "default_popup": "popup.html"
   },
   "web_accessible_resources": [
     {
-      "resources": ["pdf/*", "ruffle/*"],
-      "matches": ["*://*/*"]
+      "resources": [
+        "pdf/*"
+      ],
+      "matches": [
+        "*://*/*"
+      ]
     }
   ],
-  "host_permissions": ["*://*/*"],
-  "content_security_policy": {
-    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
-  },
+  "host_permissions": [
+    "*://*/*"
+  ],
   "manifest_version": 3
 }

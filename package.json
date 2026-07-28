@@ -1,14 +1,14 @@
 {
-  "name": "@webrecorder/archivewebpage",
-  "productName": "ArchiveWeb.page",
-  "version": "0.16.2",
+  "name": "@permavault/browser-extension",
+  "productName": "Permavault",
+  "version": "0.1.0",
   "main": "index.js",
-  "description": "Create Web Archives directly in your browser",
+  "description": "Archive web pages permanently, directly from your browser",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/webrecorder/archiveweb.page.git"
+    "url": "git+https://github.com/alexwbend/permavault-extension.git"
   },
-  "author": "Webrecorder Software",
+  "author": "Permavault (forked from Webrecorder ArchiveWeb.page)",
   "license": "AGPL-3.0-or-later",
   "dependencies": {
     "@fortawesome/fontawesome-free": "^5.13.0",
@@ -43,9 +43,6 @@
     "@typescript-eslint/parser": "^6.15.0",
     "copy-webpack-plugin": "^9.0.1",
     "css-loader": "^6.2.0",
-    "electron": "^39.2.6",
-    "electron-builder": "^26.8.1",
-    "electron-notarize": "^1.2.2",
     "eslint": "^8.28.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-lit": "^1.11.0",
@@ -78,85 +75,9 @@
   "scripts": {
     "build": "webpack --mode production",
     "build-dev": "webpack --mode development",
-    "start-electron": "NODE_ENV=development electron ./dist/electron/electron.js",
     "start-ext": "NODE_ENV=development webpack --mode=development --watch",
-    "start-embed": "yarn run build-dev && cd dist/embed/ && http-server -p 10001",
-    "update-ruffle": "./ruffle/download-latest-ruffle.sh",
-    "pack": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --publish never",
-    "pack-signed": "electron-builder",
-    "dist": "yarn run build && yarn run pack",
-    "dist-dev": "yarn run build-dev && yarn run pack",
-    "release": "yarn run build && electron-builder",
     "lint": "eslint ./src/ webpack.config.js",
     "format": "prettier --write ./"
-  },
-  "build": {
-    "afterSign": "build/notarize.js",
-    "productName": "ArchiveWeb.page",
-    "asar": true,
-    "appId": "net.webrecorder.archivewebpage",
-    "artifactName": "${productName}-${version}.${ext}",
-    "extraMetadata": {
-      "main": "dist/electron/electron.js"
-    },
-    "files": [
-      "!**/node_modules/**/*",
-      "dist/electron/**/*",
-      "!dist/electron/prebuilds/**",
-      "dist/electron/prebuilds/${platform}-${arch}/*"
-    ],
-    "dmg": {
-      "title": "ArchiveWeb.page"
-    },
-    "mac": {
-      "category": "public.app-category.utilities",
-      "target": [
-        {
-          "target": "dmg",
-          "arch": "universal"
-        },
-        {
-          "target": "zip",
-          "arch": "universal"
-        }
-      ],
-      "notarize": false,
-      "hardenedRuntime": true,
-      "gatekeeperAssess": false,
-      "entitlements": "build/entitlements.mac.plist",
-      "entitlementsInherit": "build/entitlements.mac.plist",
-      "electronLanguages": [
-        "en"
-      ],
-      "extraResources": [
-        "plugins-mac"
-      ],
-      "singleArchFiles": "{dist/electron/prebuilds,dist/electron/prebuilds/**}"
-    },
-    "linux": {
-      "category": "Archiving;Utility;",
-      "target": [
-        "AppImage"
-      ],
-      "extraResources": [
-        "plugins-linux"
-      ]
-    },
-    "win": {
-      "target": "nsis",
-      "extraResources": [
-        "plugins-win"
-      ]
-    },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": true
-    },
-    "directories": {
-      "buildResources": "build",
-      "output": "dist/bin/"
-    }
   },
   "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e",
   "engines": {

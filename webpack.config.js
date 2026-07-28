@@ -221,7 +221,6 @@ const extensionWebConfig = (env, argv) => {
 
   const copy = [
     { from: "static", to: "./" },
-    { from: "ruffle", to: "./ruffle/" },
   ];
 
   const entry = {
@@ -240,7 +239,6 @@ const electronWebConfig = (env, argv) => {
 
   const copy = [
     { from: "static/", to: "./" },
-    { from: "ruffle", to: "./ruffle/" },
     { from: "src/electron/rec-window.html", to: "" },
   ];
 
@@ -268,10 +266,7 @@ const embedWebConfig = (env, argv) => {
 };
 
 // ===========================================================================
-module.exports = [
-  extensionWebConfig,
-  electronWebConfig,
-  embedWebConfig,
-  electronMainConfig,
-  electronPreloadConfig,
-];
+// M1 (PV-207): the Permavault fork ships the browser extension only.
+// Electron app, embed page and their configs were cut; restore from upstream
+// (webrecorder/archiveweb.page) if ever needed.
+module.exports = [extensionWebConfig];
