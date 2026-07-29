@@ -30,12 +30,25 @@ export async function uploadWacz(
   blob: Blob,
   filename: string,
   sourceUrl: string,
+  screenshotBlob: Blob | null = null,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<{ status: number; json: any }> {
   const form = new FormData();
-  form.append("file", blob, filename);
+  // Wrap in a File with an explicit MIME: a bare Blob part defaults to
+  // application/octet-stream, which the server cannot route to an adapter.
+  form.append("file", new File([blob], filename, { type: "application/wacz" }));
   if (sourceUrl) {
     form.append("sourceUrl", sourceUrl);
+  }
+  // Lets the server label provenance ("captured in your browser session")
+  // on the certificate instead of implying Permavault fetched the page.
+  form.append("captureOrigin", "browser-extension");
+  if (screenshotBlob) {
+    // Viewport shot at archive-click; the server builds the exhibit PDF from it.
+    form.append(
+      "screenshot",
+      new File([screenshotBlob], "screenshot.png", { type: "image/png" }),
+    );
   }
 
   const resp = await authFetch("/archive/file", { method: "POST", body: form });

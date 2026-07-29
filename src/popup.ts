@@ -68,6 +68,7 @@ class PermavaultPopup extends LitElement {
   declare waczBlob: Blob | null;
   declare waczFilename: string;
   declare sourceUrl: string;
+  declare screenshotDataUrl: string | null;
   declare jobWs: WebSocket | null;
   declare jobTimer: ReturnType<typeof setTimeout> | null;
   constructor() {
@@ -117,6 +118,7 @@ class PermavaultPopup extends LitElement {
     this.waczBlob = null;
     this.waczFilename = "";
     this.sourceUrl = "";
+    this.screenshotDataUrl = null;
     this.jobWs = null;
     this.jobTimer = null;
   }
@@ -348,10 +350,36 @@ class PermavaultPopup extends LitElement {
     this.waitingForStart = true;
     this.phase = "capturing";
 
+    // Grab the viewport now, before autorun scrolling moves it: this shot
+    // becomes the exhibit PDF on the server. Optional, failure is fine.
+    this.captureViewportScreenshot();
+
     this.sendMessage({
       type: "startRecording",
       url: this.pageUrl,
       autorun: true,
+    });
+  }
+
+  captureViewportScreenshot() {
+    this.screenshotDataUrl = null;
+    // @ts-expect-error - TS7006 - Parameter 'tabs' implicitly has an 'any' type.
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (!tabs.length || chrome.runtime.lastError) {
+        return;
+      }
+      chrome.tabs.captureVisibleTab(
+        tabs[0].windowId,
+        { format: "png" },
+        // @ts-expect-error - TS7006 - Parameter 'dataUrl' implicitly has an 'any' type.
+        (dataUrl) => {
+          if (chrome.runtime.lastError || !dataUrl) {
+            // restricted page (chrome://, Web Store, etc.): proceed without
+            return;
+          }
+          this.screenshotDataUrl = dataUrl;
+        },
+      );
     });
   }
 
@@ -411,7 +439,20 @@ class PermavaultPopup extends LitElement {
 
     let result;
     try {
-      result = await uploadWacz(this.waczBlob, this.waczFilename, this.sourceUrl);
+      let screenshotBlob: Blob | null = null;
+      if (this.screenshotDataUrl) {
+        try {
+          screenshotBlob = await (await fetch(this.screenshotDataUrl)).blob();
+        } catch (_e) {
+          // unreadable data URL: upload without an exhibit shot
+        }
+      }
+      result = await uploadWacz(
+        this.waczBlob,
+        this.waczFilename,
+        this.sourceUrl,
+        screenshotBlob,
+      );
     } catch (_e) {
       // network or CORS failure: the server does not accept uploads from
       // extension origins yet, the capture stays in the local library
@@ -540,6 +581,7 @@ class PermavaultPopup extends LitElement {
     this.waczBlob = null;
     this.waczFilename = "";
     this.sourceUrl = "";
+    this.screenshotDataUrl = null;
     this.uploadId = "";
     this.doneKind = "";
     this.uploadPercent = null;
