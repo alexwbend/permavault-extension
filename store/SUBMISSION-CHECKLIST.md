@@ -10,20 +10,13 @@ Steps marked [Alex] need your Google account or a decision.
 - Publisher display name suggestion: `Permavault`. Verify the email you want
   shown publicly; it appears on the listing.
 
-## 2. Privacy policy sentence [Alex approves, I apply]
+## 2. Privacy policy sentence [done]
 
-Reviewers check that the privacy policy covers the extension. Ours covers
-capture records but never names the extension. Proposed addition to the
-"Capture records" section of `packages/web/frontend/src/pages/Privacy.tsx`:
-
-```
-Browser extension: if you use our browser extension, it records a page only
-when you click Archive. The captured page content is then treated exactly
-like any other capture record described above. The extension does not
-observe your browsing at any other time.
-```
-
-Say the word and I will add it and push.
+Applied and pushed (permavault bee3caf): the "What We Collect" section now
+names the browser extension and states it records a page only when the user
+clicks Archive. The technical-record detail list is scoped to server-made
+captures, since browser-session captures honestly lack server IP and TLS
+forensics. Goes live with the next frontend deploy.
 
 ## 3. Package upload [done, ready]
 
