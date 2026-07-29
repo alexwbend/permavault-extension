@@ -2,7 +2,7 @@ import { BrowserRecorder } from "./browser-recorder";
 
 import { CollectionLoader } from "@webrecorder/wabac/swlib";
 
-import { listAllMsg } from "../utils";
+import { ensureDefaultColl, listAllMsg } from "../utils";
 
 import {
   getLocalOption,
@@ -36,12 +36,17 @@ function main() {
 
   chrome.contextMenus.create({
     id: "toggle-rec",
-    title: "Start Recording",
+    title: "Archive this page",
     contexts: ["browser_action"],
   });
   chrome.contextMenus.create({
     id: "view-rec",
-    title: "View Web Archives",
+    title: "Open local library",
+    contexts: ["all"],
+  });
+  chrome.contextMenus.create({
+    id: "open-vault",
+    title: "Open vault",
     contexts: ["all"],
   });
 }
@@ -233,12 +238,24 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
         stopRecorder(tab.id);
       }
       break;
+
+    case "open-vault":
+      chrome.tabs.create({ url: "https://app.permavault.xyz" });
+      break;
   }
 });
 
 // ===========================================================================
 // @ts-expect-error - TS7006 - Parameter 'tabId' implicitly has an 'any' type. | TS7006 - Parameter 'opts' implicitly has an 'any' type.
 async function startRecorder(tabId, opts) {
+  // the one-click popup and the context menu do not pass a collection:
+  // fall back to the default one (created on demand)
+  opts = opts || {};
+  if (!opts.collId) {
+    await ensureDefaultColl(collLoader);
+    opts.collId = await getLocalOption("defaultCollId");
+  }
+
   if (!self.recorders[tabId]) {
     opts.collLoader = collLoader;
     opts.openWinMap = openWinMap;
