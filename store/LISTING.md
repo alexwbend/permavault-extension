@@ -46,7 +46,7 @@ Nothing leaves your browser until you click Archive. The extension records a pag
 
 OPEN SOURCE
 
-Permavault is open source (AGPL) and builds on Webrecorder's ArchiveWeb.page capture engine. Source: https://github.com/alexwbend/permavault-extension
+The Permavault browser extension is open source (AGPL) and builds on Webrecorder's ArchiveWeb.page capture engine. Source: https://github.com/alexwbend/permavault-extension
 ```
 
 ## Category
