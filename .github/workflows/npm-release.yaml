@@ -1,28 +1,16 @@
-name: Publish Package to npmjs
+name: Retired npm publication
+
+# This application is distributed as a browser extension, not an npm package.
+# No release event or manual invocation publishes anything from this workflow.
 on:
-  release:
-    types: [published]
+  workflow_dispatch:
 
 permissions:
-  id-token: write  # Required for OIDC
   contents: read
 
 jobs:
-  build-release:
+  retired:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "24.x"
-          registry-url: "https://registry.npmjs.org"
-          cache: "yarn"
-
-      - name: Yarn Install
-        run: yarn install --frozen-lockfile
-
-      - name: Yarn Run Build
-        run: yarn run build
-
-      - name: Npm Publish!
-        run: npm publish
+      - name: Explain supported release
+        run: echo "Automatic npm publication is retired. Build Extension produces a reviewable artifact; store submission is separate."

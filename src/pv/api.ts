@@ -17,6 +17,23 @@ export async function getBalance(): Promise<PvBalance> {
   return { balance: data.balance, unlimited: !!data.unlimited };
 }
 
+export async function makePermanent(uploadId: string): Promise<string> {
+  const response = await authFetch("/payments/permanence-checkout", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ uploadIds: [uploadId] }),
+  });
+  const data = await response.json();
+  if (!response.ok || typeof data.url !== "string") {
+    throw new Error("Checkout is unavailable. Check History for this save and any payment already in progress.");
+  }
+  const url = new URL(data.url);
+  if (url.protocol !== "https:" || url.hostname !== "checkout.stripe.com") {
+    throw new Error("Checkout could not be opened. Check History to continue.");
+  }
+  return url.href;
+}
+
 // ===========================================================================
 // Upload a WACZ blob to the file-upload capture lane.
 // Returns { status, json } for the caller to branch on:

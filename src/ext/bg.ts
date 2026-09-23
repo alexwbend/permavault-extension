@@ -2,7 +2,7 @@ import { BrowserRecorder } from "./browser-recorder";
 
 import { CollectionLoader } from "@webrecorder/wabac/swlib";
 
-import { ensureDefaultColl, listAllMsg } from "../utils";
+import { listAllMsg } from "../utils";
 
 import {
   getLocalOption,
@@ -248,12 +248,14 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 // ===========================================================================
 // @ts-expect-error - TS7006 - Parameter 'tabId' implicitly has an 'any' type. | TS7006 - Parameter 'opts' implicitly has an 'any' type.
 async function startRecorder(tabId, opts) {
-  // the one-click popup and the context menu do not pass a collection:
-  // fall back to the default one (created on demand)
+  // One-click captures must not export earlier pages from a shared library.
+  // A named collection is still honored for explicit library recording.
   opts = opts || {};
   if (!opts.collId) {
-    await ensureDefaultColl(collLoader);
-    opts.collId = await getLocalOption("defaultCollId");
+    const { name } = await collLoader.initNewColl({
+      title: `Page capture ${new Date().toISOString()}`,
+    });
+    opts.collId = name;
   }
 
   if (!self.recorders[tabId]) {
