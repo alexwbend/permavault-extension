@@ -272,6 +272,10 @@ class Recorder {
   }
 
   async _stop(domSnapshot = null) {
+    // A detached debugger can call this directly. Keep finalization visible
+    // until the page record and pending database updates have finished.
+    // @ts-expect-error - TS2339 - Property 'stopping' does not exist on type 'Recorder'.
+    this.stopping = true;
     // @ts-expect-error - TS2339 - Property '_updateStatusId' does not exist on type 'Recorder'.
     clearInterval(this._updateStatusId);
     // @ts-expect-error - TS2339 - Property '_loopId' does not exist on type 'Recorder'.
@@ -298,6 +302,8 @@ class Recorder {
       await this.doUpdateLoop();
     }
 
+    // @ts-expect-error - TS2339 - Property 'stopping' does not exist on type 'Recorder'.
+    this.stopping = false;
     // @ts-expect-error - TS2551 - Property '_doStop' does not exist on type 'Recorder'. Did you mean '_stop'?
     this._doStop();
   }
