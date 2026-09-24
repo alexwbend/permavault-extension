@@ -275,3 +275,43 @@ test('signing back into original account does not resubmit an already sent packa
   assert.equal(h.instance.doneKind, 'finishing');
   assert.equal(h.uploads(), 0);
 });
+
+test('signed-out capture promises local storage and never authorizes automatic upload', async () => {
+  let notice;
+  const h = popup(value => { notice = value; return true; });
+  h.instance.walletAddress = '';
+  h.instance.phase = 'signed-out';
+  h.instance.collId = 'local';
+  h.instance.pageUrl = 'https://example.test';
+  h.instance.sendMessage = () => {};
+  h.instance.captureViewportScreenshot = () => {};
+  h.instance.onArchiveClick();
+  assert.match(notice, /^Record a local package\?/);
+  assert.match(notice, /not uploaded to Permavault or published/);
+  assert.doesNotMatch(notice, /records and uploads automatically/);
+  assert.equal(h.instance.destinationAccepted, false);
+  assert.equal(h.instance.pendingAccount, '');
+  assert.doesNotMatch(h.instance.renderHeader(), /Sign out/);
+  await h.instance.packageAndUpload();
+  assert.equal(h.instance.phase, 'review-capture');
+  assert.equal(h.pending().account, '');
+  assert.equal(h.uploads(), 0);
+  // A later sign-in alone must not adopt or submit the local bytes.
+  h.instance.walletAddress = 'new-account';
+  await h.instance.uploadCapture();
+  assert.equal(h.uploads(), 0);
+  assert.equal(h.instance.pendingAccount, '');
+});
+
+test('signed-in recording keeps explicit public upload disclosure', () => {
+  let notice;
+  const { instance } = popup(value => { notice = value; return true; });
+  instance.sendMessage = () => {};
+  instance.captureViewportScreenshot = () => {};
+  instance.onArchiveClick();
+  assert.match(notice, /^Record and upload this page\?/);
+  assert.match(notice, /public permanent storage/);
+  assert.match(notice, /records and uploads automatically/);
+  assert.equal(instance.destinationAccepted, true);
+  assert.match(instance.renderHeader(), /Sign out/);
+});

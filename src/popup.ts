@@ -38,6 +38,12 @@ const WACZ_API_PREFIX = "./w/api";
 // Give up on the progress WebSocket after this long and show the fallback
 const WS_FALLBACK_TIMEOUT = 120000;
 
+const LOCAL_CAPTURE_NOTICE = `Record a local package?
+
+This records your current browser session and may include logged-in or personal content. The captured archive stays in this browser's local library. It is not uploaded to Permavault or published by this action.
+
+You can inspect and download the package. To upload from this extension later, sign in and explicitly choose to use the package with that account, then review the upload destination.`;
+
 const CAPTURE_DESTINATION_NOTICE = `Record and upload this page?
 
 This records your current browser session and may include logged-in or personal content. The archive is sent to Permavault with readable contents. It is not locked as a Private Capture.
@@ -431,8 +437,9 @@ class PermavaultPopup extends LitElement {
   // capture flow
 
   onArchiveClick() {
-    if (!window.confirm(CAPTURE_DESTINATION_NOTICE)) return;
-    this.destinationAccepted = true;
+    const signedIn = Boolean(this.walletAddress);
+    if (!window.confirm(signedIn ? CAPTURE_DESTINATION_NOTICE : LOCAL_CAPTURE_NOTICE)) return;
+    this.destinationAccepted = signedIn;
     this.pendingAccount = this.walletAddress;
     this.capturedPageUrl = this.pageUrl;
     this.autoStopSent = false;
@@ -593,6 +600,10 @@ class PermavaultPopup extends LitElement {
   }
 
   async uploadCapture() {
+    if (!this.walletAddress) {
+      this.phase = "review-capture";
+      return;
+    }
     if (this.pendingAccountMismatch) {
       this.phase = "review-capture";
       return;
@@ -1299,7 +1310,7 @@ class PermavaultPopup extends LitElement {
   }
 
   renderHeader() {
-    const signedIn = this.phase !== "signed-out";
+    const signedIn = Boolean(this.walletAddress);
 
     return html`
       <header>
