@@ -40,7 +40,7 @@ function popup(confirm = () => true, result = { status: 202, json: { jobId: "job
   const instance = new exports.PermavaultPopup();
   instance.walletAddress = 'account';
   instance.refreshBalance = async () => {};
-  return { instance, handlers: () => handlers, uploads: () => uploads, pending: () => pending, setSession: value => { session = value; }, setPackage: blob => { context.fetch = async () => ({ ok: true, blob: async () => blob }); } };
+  return { serverExpiryDate: exports.serverExpiryDate, instance, handlers: () => handlers, uploads: () => uploads, pending: () => pending, setSession: value => { session = value; }, setPackage: blob => { context.fetch = async () => ({ ok: true, blob: async () => blob }); } };
 }
 
 test('declining recording disclosure starts no recording or screenshot', () => {
@@ -314,4 +314,27 @@ test('signed-in recording keeps explicit public upload disclosure', () => {
   assert.match(notice, /records and uploads automatically/);
   assert.equal(instance.destinationAccepted, true);
   assert.match(instance.renderHeader(), /Sign out/);
+});
+
+
+test('server expiry preserves UTC across a local date boundary and explicit ISO offsets', () => {
+  const { serverExpiryDate, instance } = popup();
+  const prior = process.env.TZ;
+  process.env.TZ = 'America/Los_Angeles';
+  try {
+    const sqlite = serverExpiryDate('2026-10-01 00:30:00');
+    assert.equal(sqlite.toISOString(), '2026-10-01T00:30:00.000Z');
+    // UTC October 1 is still September 30 in this browser timezone.
+    assert.equal(new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' }).format(sqlite), '2026-09-30');
+    assert.equal(serverExpiryDate('2026-10-01T02:30:00+02:00').getTime(), sqlite.getTime());
+    assert.equal(serverExpiryDate('2026-10-01T00:30:00Z').getTime(), sqlite.getTime());
+    assert.equal(serverExpiryDate('2026-10-01T00:30:00').getTime(), sqlite.getTime());
+    assert.equal(serverExpiryDate('2026-10-01 10:39:00').toISOString(), '2026-10-01T10:39:00.000Z');
+    instance.doneKind = 'staged'; instance.stagedExpiresAt = '2026-10-01 00:30:00';
+    assert.match(instance.renderDone(), /Expires/);
+    assert.ok(instance.renderDone().includes(sqlite.toLocaleString(undefined, { timeZoneName: 'short' })));
+    instance.stagedExpiresAt = 'not-a-date';
+    assert.equal(serverExpiryDate('not-a-date'), null);
+    assert.match(instance.renderDone(), /server did not provide an expiry/);
+  } finally { if (prior === undefined) delete process.env.TZ; else process.env.TZ = prior; }
 });

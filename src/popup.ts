@@ -52,6 +52,15 @@ Eligible article saves up to 10 MB are held for 7 days, then deleted unless you 
 
 Only continue with content you are willing and entitled to publish. You can inspect captures in the extension's local library; this action records and uploads automatically.`;
 
+// Backend expiry timestamps use SQLite UTC or ISO 8601 with a timezone.
+export function serverExpiryDate(value: string): Date | null {
+  const hasZone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value);
+  const canonical = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(value);
+  const normalized = canonical ? value.replace(" ", "T") + "Z" : hasZone ? value : "";
+  const date = new Date(normalized);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 // ===========================================================================
 class PermavaultPopup extends LitElement {
   // Type-space declarations for Lit reactive props and internals (the
@@ -1582,12 +1591,13 @@ class PermavaultPopup extends LitElement {
 
   renderDone() {
     if (this.doneKind === "staged") {
+      const expiry = serverExpiryDate(this.stagedExpiresAt);
       return html`
         <div class="panel">
           <div class="panel-title">Saved temporarily, not permanent</div>
           <p class="panel-sub">
-            ${this.stagedExpiresAt && !Number.isNaN(Date.parse(this.stagedExpiresAt))
-              ? `Expires ${new Date(this.stagedExpiresAt).toLocaleString(undefined, { timeZoneName: "short" })}.`
+            ${expiry
+              ? `Expires ${expiry.toLocaleString(undefined, { timeZoneName: "short" })}.`
               : "The server did not provide an expiry. Check History before relying on this save."}
             Unpaid saves are deleted at expiry. Making it permanent costs $0.99 and publishes the readable archive on Arweave.
           </p>
