@@ -9,6 +9,20 @@ export type PendingCapture = {
   screenshotDataUrl: string | null;
   account: string;
   submitted?: boolean;
+  large?: LargeCaptureState;
+};
+
+export type LargeCaptureState = {
+  account: string;
+  operationId: string;
+  checkoutOperationId: string;
+  sha256?: string;
+  orderId?: string;
+  checkoutSessionId?: string;
+  checkoutUrl?: string;
+  amountCents?: number;
+  sessionId?: string;
+  jobId?: string;
 };
 
 async function database() {

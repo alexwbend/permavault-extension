@@ -48,6 +48,7 @@ export async function uploadWacz(
   filename: string,
   sourceUrl: string,
   screenshotBlob: Blob | null = null,
+  expectedAccount?: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<{ status: number; json: any }> {
   const form = new FormData();
@@ -68,7 +69,7 @@ export async function uploadWacz(
     );
   }
 
-  const resp = await authFetch("/archive/file", { method: "POST", body: form });
+  const resp = await authFetch("/archive/file", { method: "POST", body: form }, false, expectedAccount);
 
   let json = null;
   try {

@@ -21,7 +21,10 @@ import {
 
 import { getBalance, uploadWacz, openWsForJob, makePermanent } from "./pv/api";
 
-import { loadPending, savePending, clearPending } from "./pv/pending";
+import { loadPending, savePending, clearPending, type LargeCaptureState } from "./pv/pending";
+
+import { startEmailGrant, loadEmailGrant, exchangeEmailGrant, type EmailGrant } from "./pv/extensionAuth";
+import { quoteLargeCapture, checkoutLargeCapture, largeCapturePaid, uploadLargeCapture } from "./pv/largeCapture";
 
 const ARTICLE_BYTES = 10 * 1024 * 1024;
 const STANDARD_BYTES = 100 * 1024 * 1024;
@@ -47,6 +50,10 @@ Only continue with content you are willing and entitled to publish. You can insp
 class PermavaultPopup extends LitElement {
   // Type-space declarations for Lit reactive props and internals (the
   // upstream codebase used per-line @ts-expect-error spam for these).
+  declare emailGrant: EmailGrant | null;
+  declare largeState: LargeCaptureState | null;
+  declare largeBusy: boolean;
+  declare largeQuote: number | null;
   declare stagedExpiresAt: string;
   declare checkoutBusy: boolean;
   declare phase: string;
@@ -94,6 +101,10 @@ class PermavaultPopup extends LitElement {
     // ui state machine:
     // loading -> signed-out -> idle -> capturing -> packaging -> uploading
     //   -> done | server-not-ready | out-of-captures | error
+    this.emailGrant = null;
+    this.largeState = null;
+    this.largeBusy = false;
+    this.largeQuote = null;
     this.stagedExpiresAt = "";
     this.checkoutBusy = false;
     this.phase = "loading";
@@ -146,6 +157,8 @@ class PermavaultPopup extends LitElement {
 
   static get properties() {
     return {
+      emailGrant: { type: Object }, largeState: { type: Object },
+      largeBusy: { type: Boolean }, largeQuote: { type: Number },
       stagedExpiresAt: { type: String },
       checkoutBusy: { type: Boolean },
       pendingAccount: { type: String },
@@ -190,6 +203,7 @@ class PermavaultPopup extends LitElement {
   // session
 
   async initSession() {
+    this.emailGrant = await loadEmailGrant();
     const session = await getStoredSession();
     if (session) {
       this.walletAddress = session.walletAddress;
@@ -202,12 +216,14 @@ class PermavaultPopup extends LitElement {
     try {
       const pending = await loadPending();
       if (pending) {
+        this.largeState = pending.large || null;
+        this.largeQuote = this.largeState?.amountCents ?? null;
         this.pendingAccount = pending.account;
         this.waczBlob = pending.blob;
         this.waczFilename = pending.filename;
         this.sourceUrl = pending.sourceUrl;
         this.screenshotDataUrl = pending.screenshotDataUrl;
-        if (pending.submitted && !this.pendingAccountMismatch) {
+        if (pending.submitted && !pending.large && !this.pendingAccountMismatch) {
           this.doneKind = "finishing";
           this.phase = "done";
         } else {
@@ -219,6 +235,32 @@ class PermavaultPopup extends LitElement {
     } catch (_e) {
       this.errorMsg = "The saved package could not be reopened. Use the local library to download your capture.";
     }
+  }
+
+  async onEmailSignIn() {
+    this.keyError = "";
+    this.signingIn = true;
+    try {
+      this.emailGrant = await startEmailGrant();
+      this.openTab(this.emailGrant.approvalUrl);
+    } catch (error) { this.keyError = error instanceof Error ? error.message : "Sign-in could not start."; }
+    finally { this.signingIn = false; }
+  }
+
+  async onCheckEmailSignIn() {
+    if (this.signingIn) return;
+    this.signingIn = true;
+    this.keyError = "";
+    try {
+      this.emailGrant = await loadEmailGrant();
+      if (!this.emailGrant) throw new Error("Start a new sign-in request.");
+      if (await exchangeEmailGrant()) {
+        this.emailGrant = null;
+        this.destinationAccepted = false;
+        await this.initSession();
+      } else this.keyError = "Waiting for approval. Enter the code above on the website, then check again.";
+    } catch (error) { this.keyError = error instanceof Error ? error.message : "Sign-in could not be checked."; }
+    finally { this.signingIn = false; }
   }
 
   async refreshBalance() {
@@ -490,7 +532,60 @@ class PermavaultPopup extends LitElement {
     if (this.pendingAccount === null) this.pendingAccount = this.walletAddress;
     await savePending({ blob: this.waczBlob, filename: this.waczFilename,
       sourceUrl: this.sourceUrl, screenshotDataUrl: this.screenshotDataUrl,
-      account: this.pendingAccount, submitted });
+      account: this.pendingAccount, submitted, ...(this.largeState ? { large: this.largeState } : {}) });
+  }
+
+  async onLargeCapture() {
+    if (this.largeBusy || !this.waczBlob || !this.walletAddress || this.pendingAccountMismatch) return;
+    this.largeBusy = true;
+    this.errorMsg = "";
+    this.phase = "review-capture";
+    try {
+      if (!this.destinationAccepted) {
+        if (!window.confirm(CAPTURE_DESTINATION_NOTICE)) return;
+        this.destinationAccepted = true;
+      }
+      if (!this.largeState) {
+        this.largeState = { account: this.walletAddress, operationId: crypto.randomUUID(), checkoutOperationId: crypto.randomUUID() };
+        await this.persistPending();
+      }
+      const state = this.largeState;
+      if (!state.sessionId) {
+        const quote = state.orderId ? { amountCents: state.amountCents || 0, included: false } : await quoteLargeCapture(this.waczBlob.size, this.walletAddress);
+        this.largeQuote = quote.amountCents;
+        if (!quote.included) {
+          if (!state.orderId) {
+            if (!window.confirm(`This measured package costs $${(quote.amountCents / 100).toFixed(2)}. Continue to checkout? The final total is shown before you pay.`)) return;
+            Object.assign(state, await checkoutLargeCapture(this.waczBlob.size, state));
+            this.largeQuote = state.amountCents ?? null;
+            await this.persistPending();
+            this.openTab(state.checkoutUrl!);
+            return;
+          }
+          if (!(await largeCapturePaid(state))) {
+            this.errorMsg = "Payment is not confirmed yet. Finish the existing checkout, then continue this package. No new payment was created.";
+            return;
+          }
+        }
+      }
+      this.phase = "uploading";
+      const result = await uploadLargeCapture({ blob: this.waczBlob, filename: this.waczFilename,
+        sourceUrl: this.sourceUrl, screenshotDataUrl: this.screenshotDataUrl, account: this.walletAddress },
+        state, () => this.persistPending(true), percent => { this.uploadPercent = percent; });
+      if (result.status === 202 && result.json.jobId) await this.trackUploadJob(result.json.jobId);
+      else this.completeCapture(result.json);
+    } catch (error) {
+      this.phase = "review-capture";
+      this.errorMsg = error instanceof Error ? error.message : "Upload paused. Your exact package is retained.";
+    } finally { this.largeBusy = false; }
+  }
+
+  async onClaimLocalCapture() {
+    if (this.pendingAccount !== "" || !this.walletAddress) return;
+    if (!window.confirm("Use this local package with the account signed in to this extension? It will be uploaded with readable contents. Review the price and destination before continuing.")) return;
+    this.pendingAccount = this.walletAddress;
+    this.destinationAccepted = false;
+    await this.persistPending();
   }
 
   get pendingAccountMismatch() {
@@ -512,7 +607,11 @@ class PermavaultPopup extends LitElement {
       }
       this.destinationAccepted = true;
     }
-    if (!this.walletAddress || (this.waczBlob && this.waczBlob.size > STANDARD_BYTES)) {
+    if (this.waczBlob && this.waczBlob.size > STANDARD_BYTES && this.walletAddress) {
+      await this.onLargeCapture();
+      return;
+    }
+    if (!this.walletAddress) {
       this.phase = "review-capture";
       return;
     }
@@ -543,6 +642,7 @@ class PermavaultPopup extends LitElement {
         this.waczFilename,
         this.sourceUrl,
         screenshotBlob,
+        this.walletAddress,
       );
     } catch (_e) {
       // The request may have reached the server. Never invite a blind retry.
@@ -703,6 +803,8 @@ class PermavaultPopup extends LitElement {
   }
 
   resetForNext() {
+    this.largeState = null;
+    this.largeQuote = null;
     void clearPending();
     this.stagedExpiresAt = "";
     this.closeJobChannel();
@@ -1248,12 +1350,17 @@ class PermavaultPopup extends LitElement {
           <p class="panel-sub">Package size: ${((this.waczBlob?.size || 0) / 1024 / 1024).toFixed(2)} MB.
             ${this.pendingAccountMismatch ? "This package was recorded under a different sign-in. It can only be downloaded here until you sign in to the original account in the extension. No capture will be spent on this account."
               : !this.walletAddress ? "Download this package, sign in by email on the website, and upload the file there. The website shows the price before payment."
-              : (this.waczBlob?.size || 0) > STANDARD_BYTES ? "Download this package and upload it on the website for an exact size-based price before payment."
+              : (this.waczBlob?.size || 0) > STANDARD_BYTES ? "Get a price for this measured package, then pay and upload here. Closing the popup pauses the upload; reopen it to continue the same bytes."
               : (this.waczBlob?.size || 0) > ARTICLE_BYTES ? "This uses one prepaid capture, or costs $4.99 if you need to buy one. The readable archive goes to public permanent storage."
               : "Eligible article saves are held free for 7 days. Making a save permanent costs $0.99."}
             Your package is retained in this browser while you arrange payment.</p>
-          ${this.walletAddress && !this.pendingAccountMismatch && (this.waczBlob?.size || 0) <= STANDARD_BYTES
-            ? html`<button class="primary" @click=${this.uploadCapture}>Continue with this package</button>` : ""}
+          ${this.pendingAccount === "" && this.walletAddress ? html`<button class="secondary" @click=${this.onClaimLocalCapture}>Use local package with this account</button>` : ""}
+          ${this.largeQuote !== null ? html`<p>Total: $${(this.largeQuote / 100).toFixed(2)}</p>` : ""}
+          ${this.errorMsg ? html`<p class="error-text">${this.errorMsg}</p>` : ""}
+          ${this.walletAddress && !this.pendingAccountMismatch
+            ? html`<button class="primary" ?disabled=${this.largeBusy} @click=${this.uploadCapture}>${this.largeBusy ? "Preparing package..." : "Continue with this package"}</button>` : ""}
+          ${this.largeState?.checkoutUrl && !this.pendingAccountMismatch ? html`<button class="secondary" @click=${() => this.openTab(this.largeState!.checkoutUrl!)}>Reopen existing checkout</button>` : ""}
+          ${!this.walletAddress ? html`<button class="secondary" @click=${this.onEmailSignIn}>Sign in with email</button>${this.renderEmailGrant()}` : ""}
           <button class="secondary" @click=${this.onDownloadCapture}>Download package</button>
           <button class="secondary" @click=${this.onOpenVault}>Open website</button>
         </div>`;
@@ -1327,13 +1434,19 @@ class PermavaultPopup extends LitElement {
     }
   }
 
+  renderEmailGrant() {
+    return this.emailGrant ? html`<p class="helper">Enter this code on the approval page: <strong>${this.emailGrant.userCode}</strong>. Only approve a request you started in this extension.</p>
+      <button class="secondary" ?disabled=${this.signingIn} @click=${this.onCheckEmailSignIn}>Check sign-in approval</button>` : "";
+  }
+
   renderSignedOut() {
     return html`
       <p class="tagline">
         Record this page from your browser and send it to Permavault.
       </p>
-      <button class="primary" @click=${this.onOpenVault}>Sign in with email on the website</button>
-      <p class="helper">For an email account, record locally, download the package, then upload it on the website. The extension does not share the website's sign-in session.</p>
+      <button class="primary" ?disabled=${this.signingIn} @click=${this.onEmailSignIn}>Sign in with email</button>
+      <p class="helper">Sign in on the website, then approve this extension using the code shown here.</p>
+      ${this.renderEmailGrant()}
       <button class="secondary" ?disabled=${!this.canRecord} @click=${this.onArchiveClick}>Record a local package</button>
       <details><summary>Existing key-file account</summary>
       <label class="file-button">
@@ -1365,8 +1478,9 @@ class PermavaultPopup extends LitElement {
         ? html`<p class="error-text">${this.keyError}</p>`
         : ""}
       <p class="helper">
-        Use the same key file you sign in with at app.permavault.xyz. It stays
-        in this browser.
+        Key-file sign-in sends the file to Permavault over HTTPS. An encrypted
+        copy is held for the server session, and this browser saves it for
+        sign-in renewal. Email sign-in does not need a key file.
       </p></details>
     `;
   }

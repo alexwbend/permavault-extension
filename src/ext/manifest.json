@@ -1,6 +1,6 @@
 {
   "name": "Permavault",
-  "description": "Archive web pages permanently, directly from your browser",
+  "description": "Record pages from your browser, keep a local archive, and choose public permanent storage with a verifiable capture record.",
   "version": "$VERSION",
   "permissions": [
     "debugger",

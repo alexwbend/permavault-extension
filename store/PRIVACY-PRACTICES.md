@@ -1,53 +1,28 @@
-# Privacy practices answers (Privacy practices tab)
+# Privacy practices submission draft
 
-Console fields and the answers to give, consistent with
-https://app.permavault.xyz/privacy.
+Review these declarations against the exact candidate package and the live privacy policy before submitting. Do not treat a draft as a completed Store certification.
 
-## Single purpose statement
+## Single purpose
 
-```
-Permavault archives web pages permanently at the user's explicit request. The user chooses a page, clicks Archive, and the page is recorded in their own browser session, sealed with a cryptographic signature, and stored permanently so it can be verified and shared later.
-```
+Permavault records pages explicitly selected by the user as local web archives and, with the user's destination acknowledgement, uploads them for temporary saving or paid public permanent storage with a capture record.
 
-## Data usage: what the extension handles
+## Data handled
 
-Declare these item types in the console:
-
-| Console item | Answer |
+| Category | Actual handling |
 | --- | --- |
-| Authentication information | YES. Account token and Arweave keyfile, used only to sign the user in to their Permavault account. Stored locally in the browser. |
-| Website content | YES. Only the pages the user explicitly chooses to archive. That content is uploaded to the user's Permavault account and stored permanently as a public record. |
-| Personally identifiable information | Only the account identifiers needed for sign-in (wallet address, or email if the account uses one on the web app). |
-| Personal communications | NO |
-| Health / financial info | NO |
-| Location | NO |
-| Web history | NO. The extension reads the active tab's URL only when the user starts a capture. |
-| User activity | NO |
-| Search history | NO |
+| Authentication information | Email sign-in is completed on the Permavault website. A short-lived extension approval request and private verifier are retained locally until exchange for a dedicated session. Session tokens remain in extension storage and are sent to the Permavault API for authenticated requests. For the optional key-file method, the JWK is sent to the Permavault backend over HTTPS for sign-in and retained locally for renewal. The backend also stores an encrypted copy with that session. It is not a browser-only authentication method. |
+| Personally identifiable information | The account identifier is retained for authentication and account ownership checks. Email is processed by the website's email sign-in flow. Selected page content may contain other personal information. |
+| Website content | The selected page's resources, URL, title and optional screenshot are recorded locally. Upload sends readable archive contents to Permavault. Eligible small captures are temporary until paid; permanent captures are published as readable records. Private Capture is unavailable here. |
+| Browsing URLs / history | The popup reads the active tab URL and title when opened and the recorder handles URLs associated with a requested capture. It does not continuously record browsing history. Declare these selected URLs rather than claiming no URLs are handled. |
+| Personal communications, health, financial, location or other sensitive information | These can be present in a page the user selects. The recorder does not remove them. Do not certify that such content can never be collected. Account/payment processing also follows the website privacy policy. |
+| Local files and settings | The local library, exact pending archive bytes, capture settings, account binding, payment operation and upload session identifiers are stored in the browser. Pending upload packages survive popup closure so payment or upload can continue without recording different bytes. |
 
-## Data usage certification (checkboxes)
+## Purpose and transfers
 
-All three statements are true and safe to certify:
+Capture data is used to provide recording, archival and verification. Requests go to the selected page's resource hosts and the Permavault API; checkout opens Stripe. Published capture data is stored on Arweave and can be retrieved by anyone with its location. No sale of user data, advertising profile or lending assessment is part of this implementation. The publisher must confirm the applicable Store certification statements before submission.
 
-1. Data is not sold to third parties, outside the approved use cases.
-2. Data is not used or transferred for purposes unrelated to the item's single purpose.
-3. Data is not used or transferred to determine creditworthiness or for lending purposes.
+## Policy and distribution
 
-## Privacy policy URL
+Privacy policy: https://app.permavault.xyz/privacy
 
-```
-https://app.permavault.xyz/privacy
-```
-
-Known gap: the policy covers capture records but does not yet name the
-browser extension. One sentence to add before submitting (draft in
-SUBMISSION-CHECKLIST.md), because reviewers do check that the policy covers
-the extension's data flows.
-
-## Visibility / distribution
-
-- Visibility: Public (once approved).
-- Regions: all, unless you want an EU-first soft launch.
-- Pricing in console: Free (captures are sold through the web app, not
-  through Chrome payments, which is allowed because the extension itself
-  charges nothing).
+The extension is free to install; optional paid services use USD through Stripe. Publisher identity, item ID, distribution regions and actual publication status must come from the verified Developer Console. None is inferred from an upstream Webrecorder item.

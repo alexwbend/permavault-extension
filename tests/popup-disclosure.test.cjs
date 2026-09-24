@@ -15,13 +15,15 @@ function popup(confirm = () => true, result = { status: 202, json: { jobId: "job
   const template = (strings, ...values) => strings.reduce((out, part, i) => out + part + (values[i] ?? ''), '');
   const exports = {};
   const context = {
-    exports, console, Blob, URL,
+    exports, console, Blob, URL, crypto: require("node:crypto").webcrypto,
     window: { confirm, location: { href: 'chrome-extension://test/popup.html' } },
     fetch: async () => ({ ok: true, blob: async () => new Blob(['package']) }),
     customElements: { define() {} },
     setTimeout: () => 1, clearTimeout() {},
     require(name) {
       if (name === 'lit') return { LitElement: class {}, html: template, css: template };
+      if (name === './pv/extensionAuth') return { loadEmailGrant: async () => null };
+      if (name === './pv/largeCapture') return { quoteLargeCapture: async () => ({ amountCents: 999, included: false }), checkoutLargeCapture: async () => ({ orderId: 'order', checkoutSessionId: 'session', checkoutUrl: 'https://checkout.stripe.com/test', amountCents: 999 }) };
       if (name === './pv/api') return {
         uploadWacz: async () => { uploads++; return result; },
         makePermanent: async () => 'https://checkout.stripe.com/test',
@@ -133,13 +135,17 @@ test('only transaction evidence supports permanent or already-existing outcomes'
   assert.equal(instance.doneKind, 'vault');
 });
 
-test('over-100-MB package stays local for website price and payment', async () => {
+test('over-100-MB package retains checkout identity before opening payment', async () => {
   const h = popup();
+  let opened;
+  h.instance.openTab = url => { opened = url; };
   h.instance.waczBlob = { size: 100 * 1024 * 1024 + 1 };
   await h.instance.uploadCapture();
   assert.equal(h.uploads(), 0);
   assert.equal(h.instance.phase, 'review-capture');
-  assert.match(h.instance.renderMain(), /exact size-based price before payment/);
+  assert.equal(opened, 'https://checkout.stripe.com/test');
+  assert.equal(h.pending().large.orderId, 'order');
+  assert.equal(h.pending().large.checkoutSessionId, 'session');
 });
 
 test('payment rejection retains exact package and permits retry after payment', async () => {

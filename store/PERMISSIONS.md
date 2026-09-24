@@ -8,43 +8,43 @@ extra questions or a request for a demo video.
 ## debugger
 
 ```
-Permavault's core function is recording a web page exactly as the user's browser loaded it, so the page can be preserved as a standards-compliant web archive (WARC/WACZ). The Chrome DevTools protocol is the only reliable way to observe a tab's full network traffic for this purpose. The extension attaches the debugger only to the tab the user explicitly chose to archive, only after the user clicks "Archive this page", and detaches automatically when the capture stops. No browsing data is inspected, modified, or collected for any other purpose.
+Permavault's core function is recording available resources from a page in the user's browser session, so the page can be preserved as a standards-compliant web archive (WARC/WACZ). The capture engine uses the Chrome DevTools protocol to observe resource requests during the selected recording. The extension attaches the debugger only to the tab the user explicitly chose to archive, only after the user clicks "Record and upload this page" or a local recording action, and detaches automatically when the capture stops. No browsing data is inspected, modified, or collected for any other purpose.
 ```
 
 ## webRequest
 
 ```
-Used together with the capture engine to observe the requests a page makes while an archive is being recorded, so every resource that makes up the page is preserved in the archive. Observation starts only when the user starts a capture and ends when it stops.
+Used together with the capture engine to observe the requests a page makes while an archive is being recorded, so available resources can be preserved in the archive. Observation starts only when the user starts a capture and ends when it stops.
 ```
 
 ## Host permissions (*://*/*)
 
 ```
-Users can archive any page they are able to visit in their own browser, which is the product's single purpose. The extension never accesses a host on its own initiative: a capture starts only when the user clicks "Archive this page" on the tab they are viewing, and only that tab is recorded.
+Users can request a recording of pages they visit in their own browser, which is the product's single purpose. API requests also support sign-in, pricing, upload and progress. For page recording, a capture starts only when the user clicks "Record and upload this page" or a local recording action on the tab they are viewing, and recording is scoped to that requested capture session.
 ```
 
 ## activeTab
 
 ```
-Identifies the tab the user wants to archive and takes a single screenshot of the visible page at the moment the user clicks Archive. That screenshot becomes the first page of the exhibit PDF included with the sealed record.
+Identifies the tab the user wants to archive and takes a single screenshot of the visible page at the moment the user clicks Archive. When supported by the upload path, that optional screenshot can be used for an exhibit PDF. A screenshot or exhibit is not guaranteed.
 ```
 
 ## tabs
 
 ```
-Reads the URL and title of the active tab so the capture can be labeled correctly in the user's vault and matched to its source. No browsing history is collected or transmitted.
+Reads the URL and title of the active tab so the capture can be labeled correctly in the user's vault and matched to its source. The selected page URL is included in an uploaded capture; continuous browsing history is not recorded.
 ```
 
 ## contextMenus
 
 ```
-Adds one "Archive this page" entry to the right-click menu as an alternative to clicking the toolbar icon. Same action, same single purpose.
+Adds actions to record the selected page and open the local library or Permavault website. These support the same recording and archival purpose.
 ```
 
 ## storage
 
 ```
-Stores the user's sign-in session and capture settings locally in the browser.
+Stores the sign-in session, pending approval verifier, capture settings, account binding and payment/upload identifiers locally in the browser.
 ```
 
 ## unlimitedStorage
@@ -56,5 +56,5 @@ While a page is being recorded, its resources are staged locally in the extensio
 ## Remote code
 
 ```
-The extension does not execute remote code. All JavaScript and WebAssembly ship inside the extension package. WebAssembly (covered by the wasm-unsafe-eval content security policy) is used by the capture engine for compression and archive packaging, and is bundled locally, never fetched at runtime.
+The extension application JavaScript and WebAssembly ship inside the extension package. Archived website resources can include that website's own scripts as captured content. WebAssembly (covered by the wasm-unsafe-eval content security policy) is used by the capture engine and hashing utilities, and is bundled locally, never fetched at runtime.
 ```

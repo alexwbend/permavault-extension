@@ -1,165 +1,103 @@
-// Permavault session management for the extension.
-// JWK sign-in (challenge + jwk-login), Bearer token storage,
-// X-Permavault-Session rotation, silent re-login on 401.
-
+// Dedicated extension sessions. The generation fences every asynchronous
+// authentication attempt and reply, including persisted state across popups.
 import { getLocalOption, setLocalOption, removeLocalOption } from "../localstorage";
-
 const DEFAULT_API_BASE = "https://app.permavault.xyz/api";
-const ROTATION_HEADER = "x-permavault-session";
-
-// Vault web app origin, used for "Open vault" / "View in vault" links.
 export const VAULT_HOME = "https://app.permavault.xyz";
-
-export type PvSession = {
-  token: string;
-  expiresAt: number;
-  walletAddress: string;
-};
-
-// ===========================================================================
-export async function getApiBase(): Promise<string> {
-  const override = await getLocalOption("pvApiBase");
-  return (override || DEFAULT_API_BASE).replace(/\/+$/, "");
+export type PvSession = { token: string; expiresAt: number; walletAddress: string; generation?: string; jwk?: unknown };
+export async function getApiBase(): Promise<string> { return ((await getLocalOption("pvApiBase")) || DEFAULT_API_BASE).replace(/\/+$/, ""); }
+export async function getAppOrigin(): Promise<string> { return (await getApiBase()).replace(/\/api$/, ""); }
+export async function authGeneration(): Promise<string> { return (await getLocalOption("pvAuthGeneration")) || "legacy"; }
+export async function beginAuthAttempt(): Promise<string> {
+  const generation = crypto.randomUUID();
+  await setLocalOption("pvAuthGeneration", generation);
+  return generation;
 }
-
-export async function getAppOrigin(): Promise<string> {
-  const base = await getApiBase();
-  return base.replace(/\/api$/, "");
+export async function assertAuthGeneration(generation: string): Promise<void> {
+  if (await authGeneration() !== generation) throw new Error("Sign-in changed. Start again with the current account.");
 }
-
-// ===========================================================================
+function jwtPayload(token: string): Record<string, unknown> {
+  try { return JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))); }
+  catch { return {}; }
+}
 export async function getStoredSession(): Promise<PvSession | null> {
+  const generation = await authGeneration();
+  const saved = await getLocalOption("pvSession");
+  if (saved) {
+    try {
+      const session = JSON.parse(saved) as PvSession;
+      if (session.generation === generation && session.token && session.walletAddress && await authGeneration() === generation) return session;
+    } catch { /* invalid session is never used */ }
+  }
+  // Read old installs only until the first generation-aware transition.
+  if (generation !== "legacy") return null;
   const token = await getLocalOption("pvToken");
-  const expiresAt = Number((await getLocalOption("pvExpiresAt")) || 0);
-  const walletAddress = (await getLocalOption("pvWallet")) || "";
-
-  if (!token || !walletAddress) {
-    return null;
-  }
-
-  return { token, expiresAt, walletAddress };
+  const walletAddress = await getLocalOption("pvWallet");
+  const jwk = await getLocalOption("pvJwk");
+  if (!token || !walletAddress || await authGeneration() !== generation) return null;
+  return { token, walletAddress, expiresAt: Number(await getLocalOption("pvExpiresAt")) || 0,
+    generation, ...(jwk ? { jwk: JSON.parse(jwk) } : {}) };
 }
-
-async function storeSession(token: string, walletAddress: string, expiresAt?: number) {
-  await setLocalOption("pvToken", token);
-  await setLocalOption("pvWallet", walletAddress);
-
-  let exp = expiresAt || 0;
-  if (!exp) {
-    exp = expiryFromJwt(token);
-  }
-  await setLocalOption("pvExpiresAt", String(exp || 0));
+async function storeSession(session: PvSession, generation: string): Promise<void> {
+  await assertAuthGeneration(generation);
+  await setLocalOption("pvSession", JSON.stringify({ ...session, generation }));
+  await assertAuthGeneration(generation);
 }
-
-function expiryFromJwt(token: string): number {
-  try {
-    const payload = token.split(".")[1];
-    const json = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
-    return json.exp ? json.exp * 1000 : 0;
-  } catch (e) {
-    return 0;
-  }
-}
-
-export async function signOut() {
-  await removeLocalOption("pvToken");
-  await removeLocalOption("pvExpiresAt");
-  await removeLocalOption("pvWallet");
+export async function acceptEmailSession(token: string, account: string, expectedGeneration?: string) {
+  const generation = expectedGeneration ?? await beginAuthAttempt();
+  await assertAuthGeneration(generation);
   await removeLocalOption("pvJwk");
+  await storeSession({ token, walletAddress: account, expiresAt: Number(jwtPayload(token).exp || 0) * 1000 }, generation);
 }
-
-// ===========================================================================
-// Sign in with an Arweave JWK keyfile (parsed JSON object).
-// The JWK is stored locally so an expired session can be renewed silently.
-export async function signInWithJwk(jwk: unknown): Promise<PvSession> {
-  const base = await getApiBase();
-
-  const challengeResp = await fetch(`${base}/auth/challenge`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: "{}",
-  });
-
-  if (!challengeResp.ok) {
-    throw new Error(`challenge_failed:${challengeResp.status}`);
-  }
-
-  const { challengeToken } = await challengeResp.json();
-
-  const loginResp = await fetch(`${base}/auth/jwk-login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ challengeToken, jwk }),
-  });
-
-  if (!loginResp.ok) {
-    throw new Error(`login_failed:${loginResp.status}`);
-  }
-
-  const data = await loginResp.json();
-
-  await setLocalOption("pvJwk", JSON.stringify(jwk));
-  await storeSession(data.token, data.walletAddress, data.expiresAt);
-
-  return {
-    token: data.token,
-    expiresAt: data.expiresAt || expiryFromJwt(data.token),
-    walletAddress: data.walletAddress,
-  };
+async function revokeSession(session: PvSession, base: string) {
+  try { await fetch(`${base}/auth/logout`, {
+    method: "POST", headers: { Authorization: `Bearer ${session.token}` }, keepalive: true,
+  }); } catch { /* local sign-out does not depend on a working network */ }
 }
-
-// ===========================================================================
-async function persistRotation(resp: Response) {
-  const rotated = resp.headers.get(ROTATION_HEADER);
-  if (rotated) {
-    const wallet = (await getLocalOption("pvWallet")) || "";
-    await storeSession(rotated, wallet);
-  }
-}
-
-async function tryRelogin(): Promise<boolean> {
-  const stored = await getLocalOption("pvJwk");
-  if (!stored) {
-    return false;
-  }
-  try {
-    await signInWithJwk(JSON.parse(stored));
-    return true;
-  } catch (e) {
-    console.warn("Permavault re-login failed", e);
-    return false;
-  }
-}
-
-// ===========================================================================
-// Authenticated fetch against the Permavault API.
-// - injects the Bearer token
-// - persists rotated session tokens from X-Permavault-Session
-// - on 401, silently re-runs JWK login once and retries
-export async function authFetch(
-  path: string,
-  init: RequestInit = {},
-  retried = false,
-): Promise<Response> {
+export async function signOut() {
   const session = await getStoredSession();
-  if (!session) {
-    throw new Error("not_signed_in");
-  }
-
   const base = await getApiBase();
-  const headers = new Headers(init.headers || {});
-  headers.set("Authorization", `Bearer ${session.token}`);
-
-  const resp = await fetch(`${base}${path}`, { ...init, headers });
-
-  await persistRotation(resp);
-
-  if (resp.status === 401 && !retried) {
-    const ok = await tryRelogin();
-    if (ok) {
-      return authFetch(path, init, true);
-    }
+  await beginAuthAttempt(); // invalidate before any remote operation
+  await Promise.all(["pvSession", "pvEmailGrant", "pvToken", "pvExpiresAt", "pvWallet", "pvJwk"].map(removeLocalOption));
+  if (session) void revokeSession(session, base);
+}
+export async function signInWithJwk(jwk: unknown, expectedGeneration?: string): Promise<PvSession> {
+  const generation = expectedGeneration ?? await beginAuthAttempt();
+  await assertAuthGeneration(generation);
+  const base = await getApiBase();
+  const challenge = await fetch(`${base}/auth/challenge`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+  if (!challenge.ok) throw new Error(`challenge_failed:${challenge.status}`);
+  const { challengeToken } = await challenge.json();
+  await assertAuthGeneration(generation);
+  const response = await fetch(`${base}/auth/jwk-login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ challengeToken, jwk }) });
+  if (!response.ok) throw new Error(`login_failed:${response.status}`);
+  const data = await response.json();
+  const session = { token: data.token, walletAddress: data.walletAddress,
+    expiresAt: typeof data.expiresAt === "string" ? Date.parse(data.expiresAt) : Number(data.expiresAt) || Number(jwtPayload(data.token).exp || 0) * 1000,
+    generation, jwk };
+  try { await storeSession(session, generation); }
+  catch (error) { void revokeSession(session, base); throw error; }
+  return session;
+}
+export async function authFetch(path: string, init: RequestInit = {}, retried = false, expectedAccount?: string): Promise<Response> {
+  const session = await getStoredSession();
+  if (!session) throw new Error("not_signed_in");
+  if (expectedAccount && session.walletAddress !== expectedAccount) throw new Error("The signed-in account changed. Sign in to the account that owns this package.");
+  const generation = session.generation || "legacy";
+  const base = await getApiBase();
+  const headers = new Headers(init.headers || {}); headers.set("Authorization", `Bearer ${session.token}`);
+  await assertAuthGeneration(generation);
+  const response = await fetch(`${base}${path}`, { ...init, headers });
+  await assertAuthGeneration(generation);
+  const rotated = response.headers.get("x-permavault-session");
+  if (rotated) await storeSession({ ...session, token: rotated, expiresAt: Number(jwtPayload(rotated).exp || 0) * 1000 }, generation);
+  if (response.status === 401 && !retried && session.jwk) {
+    const refreshed = await signInWithJwk(session.jwk, generation);
+    if (refreshed.walletAddress !== session.walletAddress) throw new Error("Renewal returned a different account.");
+    return authFetch(path, init, true, expectedAccount || session.walletAddress);
   }
-
-  return resp;
+  // Native API callers consume JSON asynchronously. Account changes while the
+  // response body downloads must not advance an old capture or payment screen.
+  const read = response.json.bind(response);
+  response.json = async () => { const data = await read(); await assertAuthGeneration(generation); return data; };
+  return response;
 }

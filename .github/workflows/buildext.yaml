@@ -26,7 +26,7 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
       - name: Check capture flow
-        run: node --test tests/popup-disclosure.test.cjs
+        run: node --test tests/*.test.cjs
       - name: Check TypeScript
         run: yarn run tsc --noEmit
       - name: Build extension
