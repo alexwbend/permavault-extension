@@ -362,6 +362,10 @@ test('Private intent survives reopening and cannot fall into public upload', asy
   assert.equal(h.uploads(), 0);
   assert.equal(h.privateUploads(), 0);
   assert.match(h.instance.errorMsg, /could not be locked/);
+  h.instance.refreshTabInfo = () => {};
+  h.instance.onTryAgain();
+  assert.equal(h.instance.phase, 'idle');
+  assert.equal(h.instance.privateSelected, true);
 });
 
 

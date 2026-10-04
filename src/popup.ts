@@ -898,7 +898,9 @@ class PermavaultPopup extends LitElement {
 
   onTryAgain() {
     if (this.privateSelected && !this.privateArticle) {
-      this.errorMsg = "Open the local library to inspect this package, then start a new Private save.";
+      // The raw WACZ is still in the local library. Start a fresh Private
+      // capture instead of retrying with bytes that were never locked.
+      this.resetForNext();
       return;
     }
     if (this.waczBlob) {
