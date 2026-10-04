@@ -1,4 +1,5 @@
 import { openDB } from "idb";
+import type { LockedArticle } from "./privateArticle";
 
 // Store the exact packaged bytes, not a recipe that can change while the
 // user is paying in another tab. Browser-local storage survives popup closure.
@@ -10,6 +11,7 @@ export type PendingCapture = {
   account: string;
   submitted?: boolean;
   large?: LargeCaptureState;
+  privateArticle?: Omit<LockedArticle, "blob" | "filename">;
 };
 
 export type LargeCaptureState = {
