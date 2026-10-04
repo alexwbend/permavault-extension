@@ -24,7 +24,7 @@ test('private article locks exact WACZ, sealed manifest and blinded anchor befor
   const calls = [];
   const { api, age } = await articleModule(async (url, init, _retried, account) => {
     calls.push({ url, init, account });
-    if (url === '/vault/recipient') return response(200, { vault: { id: 'vault-1', recipient, formatVersion: 1 } });
+    if (url === '/vault/recipient') return response(200, { vault: { id: 'vault-1', recipient, formatVersion: 'age-v1' } });
     return response(202, { jobId: 'private-job' });
   });
   const identity = await age.generateIdentity();
@@ -69,12 +69,12 @@ test('private article refuses invalid, oversized and replaced-vault captures wit
   const recipient = await age.identityToRecipient(identity);
   let sent = 0;
   const { api } = await articleModule(async url => {
-    if (url === '/vault/recipient') return response(200, { vault: { id: 'vault-2', recipient, formatVersion: 1 } });
+    if (url === '/vault/recipient') return response(200, { vault: { id: 'vault-2', recipient, formatVersion: 'age-v1' } });
     sent++;
     return response(202, {});
   });
-  await assert.rejects(api.lockArticle(new Blob([new Uint8Array([1,2,3,4])]), { id: 'vault-1', recipient, formatVersion: 1 }), /not a valid WACZ/);
-  await assert.rejects(api.lockArticle(new Blob([new Uint8Array(api.ARTICLE_BYTES + 1)]), { id: 'vault-1', recipient, formatVersion: 1 }), /up to 10 MB/);
+  await assert.rejects(api.lockArticle(new Blob([new Uint8Array([1,2,3,4])]), { id: 'vault-1', recipient, formatVersion: 'age-v1' }), /not a valid WACZ/);
+  await assert.rejects(api.lockArticle(new Blob([new Uint8Array(api.ARTICLE_BYTES + 1)]), { id: 'vault-1', recipient, formatVersion: 'age-v1' }), /up to 10 MB/);
   await assert.rejects(api.stagePrivateArticle({ blob: new Blob(['age']), filename: 'private.age', vaultId: 'vault-1', recipient, plaintextSize: 4, sealedManifest: 'sealed', anchorSha256: 'a'.repeat(64), operationId: 'same-operation' }, 'owner'), /Vault changed/);
   assert.equal(sent, 0);
 });

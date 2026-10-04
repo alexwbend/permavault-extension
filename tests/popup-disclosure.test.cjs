@@ -33,7 +33,7 @@ function popup(confirm = () => true, result = { status: 202, json: { jobId: "job
       };
       if (name === './pv/privateArticle') return {
         ARTICLE_BYTES: 10 * 1024 * 1024,
-        getPrivateVault: async () => ({ id: 'vault', recipient: 'age1recipient', formatVersion: 1 }),
+        getPrivateVault: async () => ({ id: 'vault', recipient: 'age1recipient', formatVersion: 'age-v1' }),
         lockArticle: async blob => ({ blob: new Blob(['locked']), filename: 'private.age', vaultId: 'vault', recipient: 'age1recipient', plaintextSize: blob.size, sealedManifest: 'sealed', anchorSha256: 'a'.repeat(64), operationId: 'same-operation' }),
         stagePrivateArticle: async () => { privateUploads++; return result; },
       };

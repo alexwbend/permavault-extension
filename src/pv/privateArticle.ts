@@ -4,7 +4,7 @@ import { authFetch } from "./auth";
 export const ARTICLE_BYTES = 10 * 1024 * 1024;
 const RECIPIENT = /^age1[02-9ac-hj-np-z]{50,120}$/u;
 
-export type PrivateVault = { id: string; recipient: string; formatVersion: number };
+export type PrivateVault = { id: string; recipient: string; formatVersion: "age-v1" };
 
 export type LockedArticle = {
   blob: Blob;
@@ -47,7 +47,7 @@ export async function getPrivateVault(account?: string): Promise<PrivateVault> {
   }
   const data = await response.json();
   const vault = data?.vault;
-  if (!vault || typeof vault.id !== "string" || !RECIPIENT.test(vault.recipient) || !Number.isInteger(vault.formatVersion)) {
+  if (!vault || typeof vault.id !== "string" || !RECIPIENT.test(vault.recipient) || vault.formatVersion !== "age-v1") {
     throw new Error("Your Private Vault could not be verified. No page was sent.");
   }
   return vault;
