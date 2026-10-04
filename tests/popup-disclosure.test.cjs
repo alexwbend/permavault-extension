@@ -11,6 +11,8 @@ function popup(confirm = () => true, result = { status: 202, json: { jobId: "job
   let pending;
   let handlers;
   let uploads = 0;
+  let privateUploads = 0;
+  const local = new Map();
   let session = { walletAddress: 'account' };
   const template = (strings, ...values) => strings.reduce((out, part, i) => out + part + (values[i] ?? ''), '');
   const exports = {};
@@ -29,6 +31,17 @@ function popup(confirm = () => true, result = { status: 202, json: { jobId: "job
         makePermanent: async () => 'https://checkout.stripe.com/test',
         openWsForJob: async (_job, callbacks) => { handlers = callbacks; return { close() {} }; },
       };
+      if (name === './pv/privateArticle') return {
+        ARTICLE_BYTES: 10 * 1024 * 1024,
+        getPrivateVault: async () => ({ id: 'vault', recipient: 'age1recipient', formatVersion: 'age-v1' }),
+        lockArticle: async blob => ({ blob: new Blob(['locked']), filename: 'private.age', vaultId: 'vault', recipient: 'age1recipient', plaintextSize: blob.size, sealedManifest: 'sealed', anchorSha256: 'a'.repeat(64), operationId: 'same-operation' }),
+        stagePrivateArticle: async () => { privateUploads++; return result; },
+      };
+      if (name === './localstorage') return {
+        getLocalOption: async key => local.get(key),
+        setLocalOption: async (key, value) => { local.set(key, value); },
+        removeLocalOption: async key => { local.delete(key); },
+      };
       if (name === './pv/pending') return { savePending: async value => { pending = value; }, loadPending: async () => pending, clearPending: async () => { pending = undefined; } };
       if (name === './pv/auth') return { VAULT_HOME: 'https://app.permavault.xyz', getStoredSession: async () => session, signInWithJwk: async () => session };
       return {};
@@ -40,7 +53,7 @@ function popup(confirm = () => true, result = { status: 202, json: { jobId: "job
   const instance = new exports.PermavaultPopup();
   instance.walletAddress = 'account';
   instance.refreshBalance = async () => {};
-  return { serverExpiryDate: exports.serverExpiryDate, instance, handlers: () => handlers, uploads: () => uploads, pending: () => pending, setSession: value => { session = value; }, setPackage: blob => { context.fetch = async () => ({ ok: true, blob: async () => blob }); } };
+  return { serverExpiryDate: exports.serverExpiryDate, instance, handlers: () => handlers, uploads: () => uploads, privateUploads: () => privateUploads, pending: () => pending, local, setSession: value => { session = value; }, setPackage: blob => { context.fetch = async () => ({ ok: true, blob: async () => blob }); } };
 }
 
 test('declining recording disclosure starts no recording or screenshot', () => {
@@ -61,14 +74,14 @@ test('resumed capture cannot upload without destination acceptance', async () =>
   assert.match(harness.instance.errorMsg, /Upload cancelled/);
 });
 
-test('accepted recording starts and carries acceptance to upload', () => {
+test('accepted recording starts and carries acceptance to upload', async () => {
   let notice = '';
   const { instance } = popup(text => { notice = text; return true; });
   let message;
   instance.pageUrl = 'https://example.com/private';
   instance.captureViewportScreenshot = () => {};
   instance.sendMessage = value => { message = value; };
-  instance.onArchiveClick();
+  await instance.onArchiveClick();
   assert.equal(message.type, 'startRecording');
   assert.equal(instance.destinationAccepted, true);
   assert.match(notice, /logged-in or personal content/);
@@ -285,7 +298,7 @@ test('signed-out capture promises local storage and never authorizes automatic u
   h.instance.pageUrl = 'https://example.test';
   h.instance.sendMessage = () => {};
   h.instance.captureViewportScreenshot = () => {};
-  h.instance.onArchiveClick();
+  await h.instance.onArchiveClick();
   assert.match(notice, /^Record a local package\?/);
   assert.match(notice, /not uploaded to Permavault or published/);
   assert.doesNotMatch(notice, /records and uploads automatically/);
@@ -303,17 +316,56 @@ test('signed-out capture promises local storage and never authorizes automatic u
   assert.equal(h.instance.pendingAccount, '');
 });
 
-test('signed-in recording keeps explicit public upload disclosure', () => {
+test('signed-in recording keeps explicit public upload disclosure', async () => {
   let notice;
   const { instance } = popup(value => { notice = value; return true; });
   instance.sendMessage = () => {};
   instance.captureViewportScreenshot = () => {};
-  instance.onArchiveClick();
+  await instance.onArchiveClick();
   assert.match(notice, /^Record and upload this page\?/);
   assert.match(notice, /public permanent storage/);
   assert.match(notice, /records and uploads automatically/);
   assert.equal(instance.destinationAccepted, true);
   assert.match(instance.renderHeader(), /Sign out/);
+});
+
+test('Private choice suppresses screenshot and stages only the locked package', async () => {
+  const h = popup();
+  const instance = h.instance;
+  instance.phase = 'idle';
+  instance.privateSelected = true;
+  instance.pageUrl = 'https://example.com/secret';
+  instance.captureViewportScreenshot = () => assert.fail('private screenshot captured');
+  instance.sendMessage = () => {};
+  await instance.onArchiveClick();
+  assert.equal(h.local.get('pvPendingPrivacy'), 'private');
+  instance.collId = 'capture';
+  h.setPackage(new Blob(['plain WACZ']));
+  await instance.packageAndUpload();
+  assert.equal(h.privateUploads(), 1);
+  assert.equal(h.uploads(), 0);
+  assert.equal(h.pending().filename, 'private.age');
+  assert.equal(h.pending().sourceUrl, '');
+  assert.equal(h.pending().screenshotDataUrl, null);
+  assert.equal(await h.pending().blob.text(), 'locked');
+  instance.completeCapture({ uploadId: 'private-save', staged: true });
+  assert.match(instance.renderDone(), /private/i);
+});
+
+test('Private intent survives reopening and cannot fall into public upload', async () => {
+  const h = popup();
+  h.local.set('pvPendingPrivacy', 'private');
+  await h.instance.initSession();
+  h.instance.waczBlob = new Blob(['plain WACZ']);
+  h.instance.destinationAccepted = true;
+  await h.instance.uploadCapture();
+  assert.equal(h.uploads(), 0);
+  assert.equal(h.privateUploads(), 0);
+  assert.match(h.instance.errorMsg, /could not be locked/);
+  h.instance.refreshTabInfo = () => {};
+  h.instance.onTryAgain();
+  assert.equal(h.instance.phase, 'idle');
+  assert.equal(h.instance.privateSelected, true);
 });
 
 
