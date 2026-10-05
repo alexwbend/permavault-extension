@@ -15,6 +15,7 @@ function popup(confirm = () => true, result = { status: 202, json: { jobId: "job
   let wsReject = false;
   let wsHang = false;
   let jobStatus = { status: 'pending', result: null };
+  const ports = [];
   const timers = new Map();
   const local = new Map();
   let session = { walletAddress: 'account' };
@@ -22,6 +23,13 @@ function popup(confirm = () => true, result = { status: 202, json: { jobId: "job
   const exports = {};
   const context = {
     exports, console, Blob, URL, crypto: require("node:crypto").webcrypto,
+    chrome: { runtime: { connect: () => {
+      const port = { messages: [], onMessage: { addListener(fn) { port.onMessageHandler = fn; } },
+        onDisconnect: { addListener(fn) { port.onDisconnectHandler = fn; } },
+        postMessage(message) { port.messages.push(message); } };
+      ports.push(port);
+      return port;
+    } } },
     window: { confirm, location: { href: 'chrome-extension://test/popup.html' } },
     fetch: async () => ({ ok: true, blob: async () => new Blob(['package']) }),
     customElements: { define() {} },
@@ -60,6 +68,7 @@ function popup(confirm = () => true, result = { status: 202, json: { jobId: "job
   instance.walletAddress = 'account';
   instance.refreshBalance = async () => {};
   return { serverExpiryDate: exports.serverExpiryDate, instance, handlers: () => handlers, uploads: () => uploads, privateUploads: () => privateUploads, pending: () => pending, local,
+    ports: () => ports,
     setJobStatus: value => { jobStatus = value; }, setWsReject: value => { wsReject = value; }, setWsHang: value => { wsHang = value; },
     runTimer: async delay => { const callback = timers.get(delay); assert.ok(callback, `timer ${delay} exists`); await callback(); },
     setSession: value => { session = value; }, setPackage: blob => { context.fetch = async () => ({ ok: true, blob: async () => blob }); } };
@@ -96,6 +105,39 @@ test('accepted recording starts and carries acceptance to upload', async () => {
   assert.match(notice, /logged-in or personal content/);
   assert.match(notice, /sent to Permavault with readable contents/);
   assert.match(notice, /7 days/);
+});
+
+test('a disconnected popup port reconnects and registers the tab before recording', () => {
+  const h = popup();
+  h.instance.tabId = 42;
+  h.instance.port = { postMessage() { throw new Error('disconnected port'); } };
+  h.instance.sendMessage({ type: 'startRecording', url: 'https://example.com', autorun: true });
+  assert.equal(h.ports()[0].messages[0].type, 'startUpdates');
+  assert.equal(h.ports()[0].messages[0].tabId, 42);
+  assert.equal(h.ports()[0].messages[1].type, 'startRecording');
+  assert.equal(h.ports()[0].messages[1].url, 'https://example.com');
+});
+
+test('a lost connection before start is reported without claiming nothing was sent', () => {
+  const h = popup();
+  h.instance.tabId = 42;
+  h.instance.connectPort();
+  h.instance.phase = 'capturing';
+  h.instance.waitingForStart = true;
+  h.ports()[0].onDisconnectHandler();
+  assert.equal(h.instance.port, null);
+  assert.equal(h.instance.phase, 'error');
+  assert.match(h.instance.errorMsg, /Check the local library/);
+  assert.doesNotMatch(h.instance.errorMsg, /Nothing was sent/);
+});
+
+test('background start failure is surfaced to the popup', () => {
+  const h = popup();
+  h.instance.phase = 'capturing';
+  h.instance.waitingForStart = true;
+  h.instance.onMessage({ type: 'startRecordingFailed' });
+  assert.equal(h.instance.phase, 'error');
+  assert.match(h.instance.errorMsg, /could not start/);
 });
 
 test('staged completion does not claim permanent storage and links to History', async () => {
@@ -282,6 +324,70 @@ test('each unnamed capture gets its own collection instead of prior pages', asyn
   await context.startRecorder(2, {});
   await context.startRecorder(3, { collId: 'explicit-library' });
   assert.deepEqual(selections, ['capture-1', 'capture-2', 'explicit-library']);
+});
+
+test('background reports an asynchronous recording-start failure', async () => {
+  const source = fs.readFileSync(path.join(__dirname, '../src/ext/bg.ts'), 'utf8');
+  const tree = ts.createSourceFile('bg.ts', source, ts.ScriptTarget.Latest, true);
+  const fn = tree.statements.find(node => ts.isFunctionDeclaration(node) && node.name.text === 'popupHandler');
+  const compiled = ts.transpileModule(fn.getText(tree), { compilerOptions: { target: ts.ScriptTarget.ES2022 } });
+  let receive;
+  let disconnect;
+  const sent = [];
+  const port = { sender: { url: 'chrome-extension://test/popup.html' },
+    onMessage: { addListener(fn) { receive = fn; } }, onDisconnect: { addListener(fn) { disconnect = fn; } },
+    postMessage(message) { sent.push(message); } };
+  let throwFailure = true;
+  const context = { chrome: { runtime: { getURL: () => 'chrome-extension://test/popup.html' } },
+    self: { recorders: {} }, collLoader: {}, listAllMsg: async () => ({ type: 'collections' }),
+    startRecorder: async () => {
+      if (throwFailure) throw new Error('cold start failed');
+      return 'debugger unavailable';
+    }, console: { warn() {} } };
+  vm.createContext(context);
+  vm.runInContext(compiled.outputText, context);
+  context.popupHandler(port);
+  await receive({ type: 'startUpdates', tabId: 42 });
+  await receive({ type: 'startRecording', url: 'https://example.com', autorun: true });
+  assert.equal(sent.at(-1).type, 'startRecordingFailed');
+  throwFailure = false;
+  await receive({ type: 'startRecording', url: 'https://example.com', autorun: true });
+  assert.equal(sent.at(-1).type, 'startRecordingFailed');
+  const newerPort = {};
+  context.self.recorders[42] = { port: newerPort };
+  disconnect();
+  assert.equal(context.self.recorders[42].port, newerPort);
+});
+
+test('a failed debugger attach remains retryable', async () => {
+  const source = fs.readFileSync(path.join(__dirname, '../src/ext/browser-recorder.ts'), 'utf8');
+  const tree = ts.createSourceFile('browser-recorder.ts', source, ts.ScriptTarget.Latest, true);
+  const cls = tree.statements.find(node => ts.isClassDeclaration(node) && node.name.text === 'BrowserRecorder');
+  const method = cls.members.find(node => node.name?.getText(tree) === '_doAttach');
+  const compiled = ts.transpileModule(`class Probe { ${method.getText(tree)} }; globalThis.Probe = Probe;`,
+    { compilerOptions: { target: ts.ScriptTarget.ES2022 } });
+  let fail = true;
+  let started = 0;
+  const context = { console, chrome: { runtime: { lastError: null }, debugger: {
+    onDetach: { addListener() {} }, onEvent: { addListener() {} },
+    attach(_tab, _version, callback) {
+      context.chrome.runtime.lastError = fail ? { message: 'debugger unavailable' } : null;
+      callback();
+    },
+  } } };
+  vm.createContext(context);
+  vm.runInContext(compiled.outputText, context);
+  const recorder = new context.Probe();
+  Object.assign(recorder, { _initDB: Promise.resolve({ store: {} }), debuggee: { tabId: 42 },
+    isAttached: false, _onDetached() {}, _onEvent() {}, doUpdateStatus() {},
+    start: async () => { started++; }, send: async () => {}, getInjectScript: () => '' });
+  await assert.rejects(recorder._doAttach(), error => error === 'debugger unavailable');
+  assert.equal(recorder.isAttached, false);
+  assert.equal(started, 0);
+  fail = false;
+  await recorder._doAttach();
+  assert.equal(recorder.isAttached, true);
+  assert.equal(started, 1);
 });
 
 

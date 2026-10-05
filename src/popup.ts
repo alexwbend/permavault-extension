@@ -235,7 +235,13 @@ class PermavaultPopup extends LitElement {
   }
 
   firstUpdated() {
-    this.connectPort();
+    try {
+      this.connectPort();
+    } catch {
+      // Let the popup load if its first connection fails. The next message
+      // opens a fresh port.
+      this.port = null;
+    }
     void this.initSession();
   }
 
@@ -375,7 +381,24 @@ class PermavaultPopup extends LitElement {
   // background port
 
   connectPort() {
-    this.port = chrome.runtime.connect({ name: "popup-port" });
+    const port = chrome.runtime.connect({ name: "popup-port" });
+    this.port = port;
+
+    port.onMessage.addListener((message: any) => {
+      if (this.port === port) this.onMessage(message);
+    });
+    port.onDisconnect.addListener(() => {
+      if (this.port !== port) return;
+      this.port = null;
+      if (this.phase === "capturing" && this.waitingForStart && !this.wasRecording) {
+        this.captureStartUnconfirmed("The recorder connection closed before the capture started. Check the local library before trying again.");
+      }
+    });
+
+    if (this.tabId) {
+      port.postMessage({ tabId: this.tabId, type: "startUpdates" });
+      return port;
+    }
 
     // @ts-expect-error - TS7006 - Parameter 'tabs' implicitly has an 'any' type.
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -384,18 +407,28 @@ class PermavaultPopup extends LitElement {
         this.pageUrl = tabs[0].url || "";
         this.pageTitle = tabs[0].title || "";
         this.updateCanRecord();
-        this.sendMessage({ tabId: this.tabId, type: "startUpdates" });
+        try {
+          this.sendMessage({ tabId: this.tabId, type: "startUpdates" });
+        } catch {
+          // Recording can still retry a fresh connection after the user clicks.
+          this.port = null;
+        }
       }
     });
-
-    this.port.onMessage.addListener((message: any) => {
-      this.onMessage(message);
-    });
+    return port;
   }
 
   // @ts-expect-error - TS7006 - Parameter 'message' implicitly has an 'any' type.
   sendMessage(message) {
-    this.port.postMessage(message);
+    try {
+      (this.port || this.connectPort()).postMessage(message);
+    } catch {
+      // postMessage throws synchronously for a disconnected runtime Port.
+      // Re-register the tab before retrying so the background handler has
+      // the correct tabId when it receives startRecording.
+      this.port = null;
+      this.connectPort().postMessage(message);
+    }
   }
 
   // @ts-expect-error - TS7006 - Parameter 'message' implicitly has an 'any' type.
@@ -407,6 +440,12 @@ class PermavaultPopup extends LitElement {
 
       case "collections":
         // collections are managed for us, nothing to do
+        break;
+
+      case "startRecordingFailed":
+        if (this.phase === "capturing" && !this.wasRecording) {
+          this.captureStartUnconfirmed("This capture could not start. Check the local library before trying again.");
+        }
         break;
     }
   }
@@ -489,6 +528,12 @@ class PermavaultPopup extends LitElement {
   // -----------------------------------------------------------------------
   // capture flow
 
+  captureStartUnconfirmed(message: string) {
+    this.waitingForStart = false;
+    this.phase = "error";
+    this.errorMsg = message;
+  }
+
   async onArchiveClick() {
     if (this.startingCapture) return;
     const signedIn = Boolean(this.walletAddress);
@@ -523,8 +568,7 @@ class PermavaultPopup extends LitElement {
         autorun: true,
       });
     } catch {
-      this.phase = "error";
-      this.errorMsg = "This capture could not start. Nothing was sent.";
+      this.captureStartUnconfirmed("This capture could not start. Check the local library before trying again.");
     } finally {
       this.startingCapture = false;
     }
@@ -1633,7 +1677,7 @@ class PermavaultPopup extends LitElement {
             <button class="primary" @click=${this.onTryAgain}>
               Try again
             </button>
-            ${this.privateSelected ? html`<button class="secondary" @click=${this.onOpenLibrary}>Open local library</button>` : ""}
+            <button class="secondary" @click=${this.onOpenLibrary}>Open local library</button>
           </div>
         `;
     }
