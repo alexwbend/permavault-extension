@@ -8,7 +8,7 @@ extra questions or a request for a demo video.
 ## debugger
 
 ```
-Permavault's core function is recording available resources from a page in the user's browser session, so the page can be preserved as a standards-compliant web archive (WARC/WACZ). The capture engine uses the Chrome DevTools protocol to observe resource requests during the selected recording. The extension attaches the debugger only to the tab the user explicitly chose to archive, only after the user clicks "Record and upload this page" or a local recording action, and detaches automatically when the capture stops. No browsing data is inspected, modified, or collected for any other purpose.
+Permavault's core function is recording available resources from a page in the user's browser session, so the page can be preserved as a standards-compliant web archive (WARC/WACZ). The capture engine uses the Chrome DevTools protocol to observe resource requests during the selected recording. The extension attaches the debugger only to the tab the user explicitly chose to archive, only after the user starts a public save, a private save, or a local recording, and detaches automatically when the capture stops. No browsing data is inspected, modified, or collected for any other purpose.
 ```
 
 ## webRequest
@@ -20,7 +20,7 @@ Used together with the capture engine to observe the requests a page makes while
 ## Host permissions (*://*/*)
 
 ```
-Users can request a recording of pages they visit in their own browser, which is the product's single purpose. API requests also support sign-in, pricing, upload and progress. For page recording, a capture starts only when the user clicks "Record and upload this page" or a local recording action on the tab they are viewing, and recording is scoped to that requested capture session.
+Users can request a recording of pages they visit in their own browser, which is the product's single purpose. API requests also support sign-in, vault recipient lookup for optional private saves, pricing, upload and progress. For page recording, a capture starts only when the user clicks the public or private save action, or a local recording action, on the tab they are viewing, and recording is scoped to that requested capture session.
 ```
 
 ## activeTab
@@ -32,7 +32,7 @@ Identifies the tab the user wants to archive and takes a single screenshot of th
 ## tabs
 
 ```
-Reads the URL and title of the active tab so the capture can be labeled correctly in the user's vault and matched to its source. The selected page URL is included in an uploaded capture; continuous browsing history is not recorded.
+Reads the URL and title of the active tab so the requested capture can be labeled locally and matched to its source. A public upload includes the selected page URL. A private article upload omits the URL from its request metadata; its locked archive still contains the recorded page. Continuous browsing history is not recorded.
 ```
 
 ## contextMenus

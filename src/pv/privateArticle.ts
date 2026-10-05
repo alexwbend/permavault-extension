@@ -66,7 +66,7 @@ export async function lockArticle(blob: Blob, vault: PrivateVault): Promise<Lock
   const nonce = crypto.getRandomValues(new Uint8Array(32));
   const manifest = {
     schemaVersion: "private-1.0",
-    generator: { name: "permavault", version: "0.1.0" },
+    generator: { name: "permavault", version: __AWP_VERSION__ },
     algorithm: "sha256",
     capture: { captureId: crypto.randomUUID(), capturedAtUtc: new Date().toISOString(), clockSource: "capture device browser clock" },
     privacyNonce: toHex(nonce),

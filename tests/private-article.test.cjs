@@ -14,6 +14,7 @@ async function articleModule(fetch) {
   vm.runInNewContext(compiled.outputText, {
     exports, require: name => name === 'age-encryption' ? age : { authFetch: fetch },
     crypto: webcrypto, Blob, File, FormData, TextEncoder, Uint8Array, Date, btoa,
+    __AWP_VERSION__: require('../package.json').version,
   });
   return { api: exports, age };
 }
@@ -39,6 +40,7 @@ test('private article locks exact WACZ, sealed manifest and blinded anchor befor
   const manifestBytes = await decrypter.decrypt(Uint8Array.from(atob(locked.sealedManifest), c => c.charCodeAt(0)), 'uint8array');
   const manifest = JSON.parse(new TextDecoder().decode(manifestBytes));
   assert.equal(manifest.schemaVersion, 'private-1.0');
+  assert.equal(manifest.generator.version, require('../package.json').version);
   assert.equal(manifest.files[0].sha256, createHash('sha256').update(bytes).digest('hex'));
   assert.equal(manifest.files[0].sizeBytes, bytes.length);
   assert.equal(manifest.mimeType, 'application/wacz');
