@@ -57,7 +57,7 @@ function popup(confirm = () => true, result = { status: 202, json: { jobId: "job
         removeLocalOption: async key => { local.delete(key); },
       };
       if (name === './pv/pending') return { savePending: async value => { pending = value; }, loadPending: async () => pending, clearPending: async () => { pending = undefined; } };
-      if (name === './pv/auth') return { VAULT_HOME: 'https://app.permavault.xyz', getStoredSession: async () => session, signInWithJwk: async () => session };
+      if (name === './pv/auth') return { VAULT_HOME: 'https://app.permavault.xyz', getStoredSession: async () => session, signInWithJwk: async () => session, signOut: async () => { session = null; } };
       return {};
     },
   };
@@ -71,8 +71,47 @@ function popup(confirm = () => true, result = { status: 202, json: { jobId: "job
     ports: () => ports,
     setJobStatus: value => { jobStatus = value; }, setWsReject: value => { wsReject = value; }, setWsHang: value => { wsHang = value; },
     runTimer: async delay => { const callback = timers.get(delay); assert.ok(callback, `timer ${delay} exists`); await callback(); },
-    setSession: value => { session = value; }, setPackage: blob => { context.fetch = async () => ({ ok: true, blob: async () => blob }); } };
+    setSession: value => { session = value; }, setPending: value => { pending = value; }, setPackage: blob => { context.fetch = async () => ({ ok: true, blob: async () => blob }); } };
 }
+
+test('signing out keeps an unfinished package visible', async () => {
+  const h = popup();
+  h.instance.phase = 'review-capture';
+  h.instance.waczBlob = new Blob(['package']);
+  await h.instance.onSignOut();
+  assert.equal(h.instance.phase, 'review-capture');
+  assert.equal(h.instance.walletAddress, '');
+});
+
+test('late account loading keeps an already reported live recording visible', async () => {
+  const h = popup();
+  h.setSession(null);
+  h.instance.phase = 'capturing';
+  h.instance.recording = true;
+  h.instance.wasRecording = true;
+  h.instance.pageUrl = 'https://example.com/privacy';
+  await h.instance.initSession();
+  assert.equal(h.instance.phase, 'capturing');
+  assert.equal(h.instance.capturedPageUrl, 'https://example.com/privacy');
+});
+
+test('a pending package blocks a new recording until explicitly set aside', async () => {
+  const h = popup();
+  const old = { blob: new Blob(['old package']), filename: 'old.wacz', sourceUrl: 'https://example.com/old', account: 'account' };
+  h.setPending(old);
+  h.instance.phase = 'signed-out';
+  h.instance.walletAddress = '';
+  h.instance.sendMessage = () => assert.fail('recording started over a pending package');
+  await h.instance.onArchiveClick();
+  assert.equal(h.instance.phase, 'review-capture');
+  assert.equal(h.instance.waczBlob, old.blob);
+  assert.equal(h.pending(), old);
+  h.instance.refreshTabInfo = () => {};
+  await h.instance.onSetAsidePending();
+  assert.equal(h.pending(), undefined);
+  assert.equal(h.instance.phase, 'signed-out');
+  assert.equal(h.instance.waczBlob, null);
+});
 
 test('declining recording disclosure starts no recording or screenshot', () => {
   const { instance } = popup(() => false);
