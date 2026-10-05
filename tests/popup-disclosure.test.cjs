@@ -12,6 +12,10 @@ function popup(confirm = () => true, result = { status: 202, json: { jobId: "job
   let handlers;
   let uploads = 0;
   let privateUploads = 0;
+  let wsReject = false;
+  let wsHang = false;
+  let jobStatus = { status: 'pending', result: null };
+  const timers = new Map();
   const local = new Map();
   let session = { walletAddress: 'account' };
   const template = (strings, ...values) => strings.reduce((out, part, i) => out + part + (values[i] ?? ''), '');
@@ -21,15 +25,17 @@ function popup(confirm = () => true, result = { status: 202, json: { jobId: "job
     window: { confirm, location: { href: 'chrome-extension://test/popup.html' } },
     fetch: async () => ({ ok: true, blob: async () => new Blob(['package']) }),
     customElements: { define() {} },
-    setTimeout: () => 1, clearTimeout() {},
+    setTimeout: (callback, delay) => { timers.set(delay, callback); return delay; },
+    clearTimeout: delay => { timers.delete(delay); },
     require(name) {
       if (name === 'lit') return { LitElement: class {}, html: template, css: template };
       if (name === './pv/extensionAuth') return { loadEmailGrant: async () => null };
-      if (name === './pv/largeCapture') return { quoteLargeCapture: async () => ({ amountCents: 999, included: false }), checkoutLargeCapture: async () => ({ orderId: 'order', checkoutSessionId: 'session', checkoutUrl: 'https://checkout.stripe.com/test', amountCents: 999 }) };
+      if (name === './pv/largeCapture') return { quoteLargeCapture: async () => ({ amountCents: 999, included: false }), checkoutLargeCapture: async () => ({ orderId: 'order', checkoutSessionId: 'session', checkoutUrl: 'https://checkout.stripe.com/test', amountCents: 999 }), uploadLargeCapture: async () => ({ status: 202, json: { jobId: 'job' } }) };
       if (name === './pv/api') return {
         uploadWacz: async () => { uploads++; return result; },
         makePermanent: async () => 'https://checkout.stripe.com/test',
-        openWsForJob: async (_job, callbacks) => { handlers = callbacks; return { close() {} }; },
+        openWsForJob: async (_job, callbacks) => { handlers = callbacks; if (wsHang) return new Promise(() => {}); if (wsReject) throw new Error('offline'); return { close() {} }; },
+        getCaptureJob: async () => jobStatus,
       };
       if (name === './pv/privateArticle') return {
         ARTICLE_BYTES: 10 * 1024 * 1024,
@@ -53,7 +59,10 @@ function popup(confirm = () => true, result = { status: 202, json: { jobId: "job
   const instance = new exports.PermavaultPopup();
   instance.walletAddress = 'account';
   instance.refreshBalance = async () => {};
-  return { serverExpiryDate: exports.serverExpiryDate, instance, handlers: () => handlers, uploads: () => uploads, privateUploads: () => privateUploads, pending: () => pending, local, setSession: value => { session = value; }, setPackage: blob => { context.fetch = async () => ({ ok: true, blob: async () => blob }); } };
+  return { serverExpiryDate: exports.serverExpiryDate, instance, handlers: () => handlers, uploads: () => uploads, privateUploads: () => privateUploads, pending: () => pending, local,
+    setJobStatus: value => { jobStatus = value; }, setWsReject: value => { wsReject = value; }, setWsHang: value => { wsHang = value; },
+    runTimer: async delay => { const callback = timers.get(delay); assert.ok(callback, `timer ${delay} exists`); await callback(); },
+    setSession: value => { session = value; }, setPackage: blob => { context.fetch = async () => ({ ok: true, blob: async () => blob }); } };
 }
 
 test('declining recording disclosure starts no recording or screenshot', () => {
@@ -102,12 +111,86 @@ test('staged completion does not claim permanent storage and links to History', 
   assert.equal(url, 'https://app.permavault.xyz/history');
 });
 
-test('disconnected progress does not claim a completed archive', async () => {
+test('disconnected progress reads the durable temporary-save receipt', async () => {
   const harness = popup();
+  harness.setJobStatus({ status: 'staged', result: {
+    uploadId: 'save', staged: true, stagedExpiresAt: '2026-10-12T12:31:05Z', txId: null, alreadyArchived: false,
+  } });
   await harness.instance.trackUploadJob('job');
   harness.handlers().onWsError();
+  await new Promise(setImmediate);
+  assert.equal(harness.instance.doneKind, 'staged');
+  assert.match(harness.instance.renderDone(), /Saved temporarily, not permanent/);
+});
+
+test('pending durable job remains uncertain after the status deadline', async () => {
+  const harness = popup();
+  await harness.instance.trackUploadJob('job');
+  await harness.runTimer(120000);
   assert.equal(harness.instance.doneKind, 'finishing');
   assert.match(harness.instance.renderDone(), /final status is not confirmed/);
+});
+
+test('status request that never replies cannot block the History fallback', async () => {
+  const harness = popup();
+  harness.setJobStatus(new Promise(() => {}));
+  await harness.instance.trackUploadJob('job');
+  harness.handlers().onWsError();
+  await harness.runTimer(120000);
+  assert.equal(harness.instance.doneKind, 'finishing');
+  assert.match(harness.instance.renderDone(), /final status is not confirmed/);
+});
+
+test('missing progress channel and stalled status still reach History fallback', async () => {
+  const harness = popup();
+  harness.setWsReject(true);
+  harness.setJobStatus(new Promise(() => {}));
+  await harness.instance.trackUploadJob('job');
+  await harness.runTimer(120000);
+  assert.equal(harness.instance.doneKind, 'finishing');
+});
+
+test('stalled progress-channel setup cannot block the deadline', async () => {
+  const harness = popup();
+  harness.setWsHang(true);
+  harness.setJobStatus(new Promise(() => {}));
+  void harness.instance.trackUploadJob('job');
+  await harness.runTimer(120000);
+  assert.equal(harness.instance.doneKind, 'finishing');
+});
+
+test('large-capture controls unlock while job tracking continues', async () => {
+  const harness = popup();
+  harness.instance.waczBlob = new Blob(['paid package']);
+  harness.instance.largeState = { account: 'account', sessionId: 'paid' };
+  harness.instance.destinationAccepted = true;
+  harness.instance.trackUploadJob = () => new Promise(() => {});
+  await Promise.race([
+    harness.instance.onLargeCapture(),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('large capture stayed busy')), 100)),
+  ]);
+  assert.equal(harness.instance.largeBusy, false);
+  assert.equal(harness.instance.phase, 'uploading');
+});
+
+test('old status reply cannot overwrite a later capture state', async () => {
+  const harness = popup();
+  let reply;
+  harness.setJobStatus(new Promise(resolve => { reply = resolve; }));
+  await harness.instance.trackUploadJob('job');
+  harness.handlers().onWsError();
+  harness.instance.refreshTabInfo = () => {};
+  harness.instance.resetForNext();
+  harness.handlers().onStage('old-stage');
+  harness.handlers().onProgress(99);
+  reply({ status: 'staged', result: {
+    uploadId: 'old-save', staged: true, stagedExpiresAt: '2026-10-12T12:31:05Z', txId: null, alreadyArchived: false,
+  } });
+  await new Promise(setImmediate);
+  assert.equal(harness.instance.phase, 'idle');
+  assert.equal(harness.instance.uploadId, '');
+  assert.notEqual(harness.instance.uploadStage, 'old-stage');
+  assert.equal(harness.instance.uploadPercent, null);
 });
 
 

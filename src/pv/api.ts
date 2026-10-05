@@ -7,6 +7,25 @@ export type PvBalance = {
   unlimited: boolean;
 };
 
+export type PvCaptureJob = {
+  status: "queued" | "running" | "pending" | "staged" | "succeeded" | "failed";
+  result: null | {
+    uploadId: string | null;
+    staged: boolean;
+    stagedExpiresAt: string | null;
+    txId: string | null;
+    alreadyArchived: boolean;
+  };
+};
+
+// The job row is durable. Use it when a live progress event is missed or the
+// WebSocket disconnects, and keep the account fence used by uploads.
+export async function getCaptureJob(jobId: string, expectedAccount: string): Promise<PvCaptureJob> {
+  const response = await authFetch(`/jobs/${encodeURIComponent(jobId)}`, {}, false, expectedAccount);
+  if (!response.ok) throw new Error(`job_status_failed:${response.status}`);
+  return response.json() as Promise<PvCaptureJob>;
+}
+
 // ===========================================================================
 export async function getBalance(): Promise<PvBalance> {
   const resp = await authFetch("/payments/balance");
