@@ -1,9 +1,9 @@
 {
   "name": "@permavault/browser-extension",
   "productName": "Permavault",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "main": "index.js",
-  "description": "Archive web pages permanently, directly from your browser",
+  "description": "Record browser pages and choose public or private permanent storage",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/alexwbend/permavault-extension.git"
