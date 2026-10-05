@@ -19,7 +19,7 @@ import {
   VAULT_HOME,
 } from "./pv/auth";
 
-import { getBalance, uploadWacz, openWsForJob, makePermanent } from "./pv/api";
+import { getBalance, uploadWacz, openWsForJob, getCaptureJob, makePermanent } from "./pv/api";
 
 import { loadPending, savePending, clearPending, type LargeCaptureState } from "./pv/pending";
 
@@ -38,6 +38,7 @@ const WACZ_API_PREFIX = "./w/api";
 
 // Give up on the progress WebSocket after this long and show the fallback
 const WS_FALLBACK_TIMEOUT = 120000;
+const JOB_POLL_INTERVAL = 5000;
 
 const LOCAL_CAPTURE_NOTICE = `Record a local package?
 
@@ -124,6 +125,8 @@ class PermavaultPopup extends LitElement {
   declare screenshotDataUrl: string | null;
   declare jobWs: WebSocket | null;
   declare jobTimer: ReturnType<typeof setTimeout> | null;
+  declare jobPollTimer: ReturnType<typeof setTimeout> | null;
+  declare jobTrackingCancel: (() => void) | null;
   constructor() {
     super();
 
@@ -187,6 +190,8 @@ class PermavaultPopup extends LitElement {
     this.screenshotDataUrl = null;
     this.jobWs = null;
     this.jobTimer = null;
+    this.jobPollTimer = null;
+    this.jobTrackingCancel = null;
   }
 
   static get properties() {
@@ -358,6 +363,7 @@ class PermavaultPopup extends LitElement {
   }
 
   async onSignOut() {
+    this.closeJobChannel();
     await signOut();
     this.walletAddress = "";
     this.balanceLoaded = false;
@@ -660,7 +666,7 @@ class PermavaultPopup extends LitElement {
       const result = await uploadLargeCapture({ blob: this.waczBlob, filename: this.waczFilename,
         sourceUrl: this.sourceUrl, screenshotDataUrl: this.screenshotDataUrl, account: this.walletAddress },
         state, () => this.persistPending(true), percent => { this.uploadPercent = percent; });
-      if (result.status === 202 && result.json.jobId) await this.trackUploadJob(result.json.jobId);
+      if (result.status === 202 && result.json.jobId) void this.trackUploadJob(result.json.jobId);
       else this.completeCapture(result.json);
     } catch (error) {
       this.phase = "review-capture";
@@ -801,11 +807,18 @@ class PermavaultPopup extends LitElement {
 
   // @ts-expect-error - TS7006 - Parameter 'jobId' implicitly has an 'any' type.
   async trackUploadJob(jobId) {
+    this.closeJobChannel();
     let settled = false;
+    let cancelled = false;
+    const account = this.walletAddress;
+    let checking: Promise<void> | null = null;
+    const cancel = () => { cancelled = true; };
+    this.jobTrackingCancel = cancel;
+    const active = () => !settled && !cancelled && this.jobTrackingCancel === cancel;
 
     // @ts-expect-error - TS7006 - Parameter 'fn' implicitly has an 'any' type.
     const finish = (fn) => {
-      if (!settled) {
+      if (active()) {
         settled = true;
         fn();
       }
@@ -819,12 +832,63 @@ class PermavaultPopup extends LitElement {
         this.closeJobChannel();
       });
 
+    const checkDurableStatus = async () => {
+      if (!active()) return;
+      if (checking) return checking;
+      const pending = (async () => {
+        try {
+          const job = await getCaptureJob(jobId, account);
+          if (!active() || this.walletAddress !== account) return;
+          const result = job.result;
+          if ((job.status === "staged" || job.status === "succeeded") &&
+              typeof result?.uploadId === "string") {
+            finish(() => {
+              this.completeCapture({
+                uploadId: result.uploadId || undefined,
+                staged: job.status === "staged",
+                stagedExpiresAt: result.stagedExpiresAt || undefined,
+                txId: result.txId || undefined,
+                alreadyArchived: result.alreadyArchived,
+              });
+              this.closeJobChannel();
+              void this.refreshBalance();
+            });
+          } else if (job.status === "failed") {
+            finish(() => {
+              this.phase = "error";
+              this.errorMsg = "The vault could not finish this capture. Your capture is safe in the local library.";
+              this.closeJobChannel();
+            });
+          }
+        } catch (_e) {
+          // A status lookup can fail while the live channel still succeeds.
+        }
+      })();
+      checking = pending;
+      await pending;
+      if (checking === pending) checking = null;
+    };
+
+    const pollDurableStatus = async () => {
+      await checkDurableStatus();
+      if (active() && this.walletAddress === account) {
+        this.jobPollTimer = setTimeout(pollDurableStatus, JOB_POLL_INTERVAL);
+      }
+    };
+
+    // The ticket request itself can stall, so arm durable recovery before
+    // waiting for the live progress channel.
+    this.jobPollTimer = setTimeout(pollDurableStatus, JOB_POLL_INTERVAL);
+    this.jobTimer = setTimeout(fallbackToFinishing, WS_FALLBACK_TIMEOUT);
+
     try {
-      this.jobWs = await openWsForJob(jobId, {
+      const ws = await openWsForJob(jobId, {
         onStage: (stage) => {
+          if (!active()) return;
           this.uploadStage = stage || "";
         },
         onProgress: (percent) => {
+          if (!active()) return;
           this.uploadPercent = typeof percent === "number" ? percent : null;
         },
         onComplete: (data) =>
@@ -841,16 +905,17 @@ class PermavaultPopup extends LitElement {
               "The vault could not finish this capture. Your capture is safe in the local library.";
             this.closeJobChannel();
           }),
-        onWsError: () => fallbackToFinishing(),
+        onWsError: () => { void checkDurableStatus(); },
       });
+      if (!active()) { ws.close(); return; }
+      this.jobWs = ws;
     } catch (_e) {
-      // could not open the progress channel at all
-      fallbackToFinishing();
+      // The authenticated job lookup still works without a progress channel.
+      void checkDurableStatus();
       return;
     }
 
-    if (settled) this.closeJobChannel();
-    else this.jobTimer = setTimeout(fallbackToFinishing, WS_FALLBACK_TIMEOUT);
+    if (!active()) this.closeJobChannel();
   }
 
   completeCapture(data: { uploadId?: string; staged?: boolean; stagedExpiresAt?: string; txId?: string; alreadyArchived?: boolean }) {
@@ -882,6 +947,12 @@ class PermavaultPopup extends LitElement {
   }
 
   closeJobChannel() {
+    this.jobTrackingCancel?.();
+    this.jobTrackingCancel = null;
+    if (this.jobPollTimer) {
+      clearTimeout(this.jobPollTimer);
+      this.jobPollTimer = null;
+    }
     if (this.jobTimer) {
       clearTimeout(this.jobTimer);
       this.jobTimer = null;
