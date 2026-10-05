@@ -205,6 +205,7 @@ class BrowserRecorder extends Recorder {
           chrome.debugger.attach(this.debuggee, "1.3", () => {
             if (chrome.runtime.lastError) {
               reject(chrome.runtime.lastError.message);
+              return;
             }
             // @ts-expect-error - TS2339 - Property 'isAttached' does not exist on type 'BrowserRecorder'.
             this.isAttached = true;

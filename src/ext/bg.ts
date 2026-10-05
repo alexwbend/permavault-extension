@@ -66,15 +66,14 @@ function popupHandler(port) {
     return;
   }
 
-  // @ts-expect-error - TS7034 - Variable 'tabId' implicitly has type 'any' in some locations where its type cannot be determined.
-  let tabId = null;
+  let tabId: number | null = null;
 
   // @ts-expect-error - TS7006 - Parameter 'message' implicitly has an 'any' type.
   port.onMessage.addListener(async (message) => {
     switch (message.type) {
       case "startUpdates":
-        tabId = message.tabId;
-        if (self.recorders[tabId]) {
+        tabId = Number.isInteger(message.tabId) && message.tabId > 0 ? message.tabId : null;
+        if (tabId && self.recorders[tabId]) {
           // @ts-expect-error - TS2339 - Property 'port' does not exist on type 'BrowserRecorder'.
           self.recorders[tabId].port = port;
           self.recorders[tabId].doUpdateStatus();
@@ -84,19 +83,34 @@ function popupHandler(port) {
 
       case "startRecording": {
         const { collId, autorun } = message;
-        // @ts-expect-error - TS2554 - Expected 2 arguments, but got 3.
-        startRecorder(tabId, { collId, port, autorun }, message.url);
+        if (!tabId) {
+          port.postMessage({ type: "startRecordingFailed" });
+          break;
+        }
+        let failed = false;
+        try {
+          // @ts-expect-error - TS2554 - Expected 2 arguments, but got 3.
+          failed = (await startRecorder(tabId, { collId, port, autorun }, message.url)) != null;
+        } catch (cause) {
+          console.warn("Could not start recording", cause);
+          failed = true;
+        }
+        if (failed) {
+          try {
+            port.postMessage({ type: "startRecordingFailed" });
+          } catch {
+            // The popup closed while the recorder was starting.
+          }
+        }
         break;
       }
 
       case "stopRecording":
-        // @ts-expect-error - TS7005 - Variable 'tabId' implicitly has an 'any' type.
-        stopRecorder(tabId);
+        if (tabId) stopRecorder(tabId);
         break;
 
       case "toggleBehaviors":
-        // @ts-expect-error - TS7005 - Variable 'tabId' implicitly has an 'any' type.
-        toggleBehaviors(tabId);
+        if (tabId) toggleBehaviors(tabId);
         break;
 
       case "newColl": {
@@ -110,9 +124,10 @@ function popupHandler(port) {
   });
 
   port.onDisconnect.addListener(() => {
-    // @ts-expect-error - TS2538 - Type 'null' cannot be used as an index type.
-    if (self.recorders[tabId]) {
-      // @ts-expect-error - TS2538 - Type 'null' cannot be used as an index type.
+    // An older popup must not clear a recorder's newer connection.
+    // @ts-expect-error - TS2339 - Property 'port' does not exist on type 'BrowserRecorder'.
+    if (tabId && self.recorders[tabId]?.port === port) {
+      // @ts-expect-error - TS2339 - Property 'port' does not exist on type 'BrowserRecorder'.
       self.recorders[tabId].port = null;
     }
   });
@@ -277,7 +292,7 @@ async function startRecorder(tabId, opts) {
       await self.recorders[tabId].attach();
     } catch (e) {
       console.warn(e);
-      err = e;
+      err = e ?? new Error("Recorder could not start");
     }
     return err;
   }
