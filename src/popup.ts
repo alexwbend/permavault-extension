@@ -287,6 +287,13 @@ class PermavaultPopup extends LitElement {
     } catch (_e) {
       this.errorMsg = "The saved package could not be reopened. Use the local library to download your capture.";
     }
+    // The background recorder may answer before account and pending-package
+    // storage finish loading. Keep its live state when that happens.
+    if (this.recording) {
+      this.phase = "capturing";
+      this.wasRecording = true;
+      this.capturedPageUrl = this.pageUrl;
+    }
   }
 
   async refreshPrivateVault() {
@@ -374,7 +381,9 @@ class PermavaultPopup extends LitElement {
     this.walletAddress = "";
     this.balanceLoaded = false;
     this.privateVaultReady = false;
-    this.phase = "signed-out";
+    // Keep an unfinished package visible so a local-only capture cannot
+    // silently replace it after the account changes.
+    this.phase = this.recording ? "capturing" : this.waczBlob ? "review-capture" : "signed-out";
   }
 
   // -----------------------------------------------------------------------
@@ -536,10 +545,34 @@ class PermavaultPopup extends LitElement {
 
   async onArchiveClick() {
     if (this.startingCapture) return;
+    this.startingCapture = true;
+    let pending: Awaited<ReturnType<typeof loadPending>>;
+    try {
+      pending = await loadPending();
+    } catch {
+      this.phase = "error";
+      this.errorMsg = "The pending package could not be checked. Open the local library before trying again.";
+      this.startingCapture = false;
+      return;
+    }
+    if (this.waczBlob || pending) {
+      if (pending && !this.waczBlob) {
+        this.waczBlob = pending.blob;
+        this.waczFilename = pending.filename;
+        this.sourceUrl = pending.sourceUrl;
+        this.pendingAccount = pending.account;
+      }
+      this.errorMsg = "Finish or set aside the pending package before recording another page. It remains in your local library.";
+      this.phase = "review-capture";
+      this.startingCapture = false;
+      return;
+    }
     const signedIn = Boolean(this.walletAddress);
     const privateRequested = signedIn && this.privateSelected;
-    if (!window.confirm(privateRequested ? PRIVATE_CAPTURE_NOTICE : signedIn ? CAPTURE_DESTINATION_NOTICE : LOCAL_CAPTURE_NOTICE)) return;
-    this.startingCapture = true;
+    if (!window.confirm(privateRequested ? PRIVATE_CAPTURE_NOTICE : signedIn ? CAPTURE_DESTINATION_NOTICE : LOCAL_CAPTURE_NOTICE)) {
+      this.startingCapture = false;
+      return;
+    }
     try {
       if (privateRequested) await getPrivateVault(this.walletAddress);
       await setLocalOption("pvPendingPrivacy", privateRequested ? "private" : "public");
@@ -1030,10 +1063,22 @@ class PermavaultPopup extends LitElement {
     this.resetForNext();
   }
 
-  resetForNext() {
+  async onSetAsidePending() {
+    if (!window.confirm("Set aside this pending upload package? The recorded page stays in your local library. If an upload was already submitted, it may still finish; check History on the website.")) return;
+    try {
+      await clearPending();
+    } catch {
+      this.errorMsg = "The pending package could not be set aside. Open the local library before trying again.";
+      return;
+    }
+    this.resetForNext(false);
+    if (!this.walletAddress) this.phase = "signed-out";
+  }
+
+  resetForNext(clearStoredPending = true) {
     this.largeState = null;
     this.largeQuote = null;
-    void clearPending();
+    if (clearStoredPending) void clearPending();
     void removeLocalOption("pvPendingPrivacy");
     this.stagedExpiresAt = "";
     this.closeJobChannel();
@@ -1610,6 +1655,7 @@ class PermavaultPopup extends LitElement {
           ${this.largeState?.checkoutUrl && !this.pendingAccountMismatch ? html`<button class="secondary" @click=${() => this.openTab(this.largeState!.checkoutUrl!)}>Reopen existing checkout</button>` : ""}
           ${!this.walletAddress ? html`<button class="secondary" @click=${this.onEmailSignIn}>Sign in with email</button>${this.renderEmailGrant()}` : ""}
           <button class="secondary" @click=${this.onDownloadCapture}>Download ${this.privateSelected ? "locked" : "local"} package</button>
+          <button class="secondary" @click=${this.onSetAsidePending}>Set aside and record another page</button>
           <button class="secondary" @click=${this.onOpenVault}>Open website</button>
         </div>`;
 

@@ -1,7 +1,7 @@
 {
   "name": "@permavault/browser-extension",
   "productName": "Permavault",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "main": "index.js",
   "description": "Record browser pages and choose public or private permanent storage",
   "repository": {
