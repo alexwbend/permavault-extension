@@ -1006,6 +1006,14 @@ class PermavaultPopup extends LitElement {
 
   async onMakePermanent() {
     if (this.checkoutBusy || !this.uploadId) return;
+    // PV-470: a private save is a paid private capture, so the customer first
+    // confirms we may start straight away, on the save's own page in
+    // Permavault, where that acknowledgement is shown and recorded. The server
+    // refuses a private checkout without it.
+    if (this.privateSelected) {
+      this.openTab(`${VAULT_HOME}/view/${this.uploadId}`);
+      return;
+    }
     this.checkoutBusy = true;
     this.errorMsg = "";
     try { this.openTab(await makePermanent(this.uploadId)); }
@@ -1885,7 +1893,7 @@ class PermavaultPopup extends LitElement {
               ? "Unpaid saves are deleted at expiry. Making it permanent costs $1.99. The stored archive remains locked; open it through your Private Vault."
               : "Unpaid saves are deleted at expiry. Making it permanent costs $0.99 and publishes the readable archive on Arweave."}
           </p>
-          ${this.uploadId ? html`<button class="primary" ?disabled=${this.checkoutBusy} @click=${this.onMakePermanent}>Make permanent for ${this.privateSelected ? "$1.99" : "$0.99"}</button>` : ""}
+          ${this.uploadId ? html`<button class="primary" ?disabled=${this.checkoutBusy} @click=${this.onMakePermanent}>${this.privateSelected ? "Make permanent for $1.99 in Permavault" : "Make permanent for $0.99"}</button>` : ""}
           ${this.errorMsg ? html`<p class="error-text">${this.errorMsg}</p>` : ""}
           <button class="secondary" @click=${this.onOpenHistory}>View in History</button>
           <button class="secondary" @click=${this.onArchiveAnother}>Archive another page</button>

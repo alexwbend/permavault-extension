@@ -299,6 +299,17 @@ test('staged result uses exact server expiry and offers checkout', async () => {
   assert.equal(url, 'https://checkout.stripe.com/test');
 });
 
+test('a private save is made permanent on its page in Permavault, where the acknowledgement is asked (PV-470)', async () => {
+  const h = popup();
+  h.instance.privateSelected = true;
+  h.instance.completeCapture({ uploadId: 'private-save', staged: true, stagedExpiresAt: '2026-10-01T12:00:00Z', txId: null });
+  assert.match(h.instance.renderDone(), /Make permanent for \$1.99 in Permavault/);
+  let url;
+  h.instance.openTab = value => { url = value; };
+  await h.instance.onMakePermanent();
+  assert.equal(url, 'https://app.permavault.xyz/view/private-save');
+});
+
 test('only transaction evidence supports permanent or already-existing outcomes', () => {
   const { instance } = popup();
   instance.completeCapture({ uploadId: 'save' });
