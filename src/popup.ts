@@ -726,8 +726,15 @@ class PermavaultPopup extends LitElement {
         this.largeQuote = quote.amountCents;
         if (!quote.included) {
           if (!state.orderId) {
-            if (!window.confirm(`This measured package costs $${(quote.amountCents / 100).toFixed(2)}. Continue to checkout? The final total is shown before you pay.`)) return;
-            Object.assign(state, await checkoutLargeCapture(this.waczBlob.size, state));
+            // PV-475: the server's line, and pressing OK is the request to
+            // pay and preserve now. The final total shows again in Stripe.
+            const ack = "withdrawalAck" in quote ? quote.withdrawalAck : undefined;
+            const price = `$${(quote.amountCents / 100).toFixed(2)}`;
+            const ask = ack
+              ? `This measured package costs ${price}.\n\n${ack.text}\n\nPress OK to pay and preserve now. The final total is shown before you pay.`
+              : `This measured package costs ${price}. Continue to checkout? The final total is shown before you pay.`;
+            if (!window.confirm(ask)) return;
+            Object.assign(state, await checkoutLargeCapture(this.waczBlob.size, state, ack?.version));
             this.largeQuote = state.amountCents ?? null;
             await this.persistPending();
             this.openTab(state.checkoutUrl!);

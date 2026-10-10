@@ -15,17 +15,28 @@ export function stripeUrl(value: string): string {
   if (url.protocol !== "https:" || url.hostname !== "checkout.stripe.com") throw new Error("Checkout address could not be verified.");
   return url.href;
 }
-export async function quoteLargeCapture(size: number, account: string): Promise<{ amountCents: number; included: boolean }> {
+/**
+ * PV-475: a capture over 100 MB gives up the 14-day right to cancel once it is
+ * stored, so it is paid with the request to start straight away. The line
+ * comes from the server (the estimate), is shown before paying, and its
+ * version goes back with the checkout, which the server records.
+ */
+export interface WithdrawalAck { version: string; text: string }
+export async function quoteLargeCapture(size: number, account: string): Promise<{ amountCents: number; included: boolean; withdrawalAck?: WithdrawalAck }> {
   const { data } = await json("/archive/file/estimate", { fileSize: size, mimeType: "application/wacz" }, account);
   if (data.estimate?.available === false) throw new Error("Storage is temporarily unavailable. Your local capture is retained.");
   if (data.estimate?.pricing !== "dynamic") return { amountCents: 0, included: true };
   const amountCents = data.estimate.quote?.amountCents;
   if (!Number.isSafeInteger(amountCents) || amountCents <= 0) throw new Error("An exact price is not available yet.");
-  return { amountCents, included: false };
+  const ack = data.estimate.withdrawalAck;
+  const withdrawalAck = ack && typeof ack.version === "string" && typeof ack.text === "string" && ack.version && ack.text
+    ? { version: ack.version as string, text: ack.text as string } : undefined;
+  return { amountCents, included: false, ...(withdrawalAck ? { withdrawalAck } : {}) };
 }
-export async function checkoutLargeCapture(size: number, state: LargeCaptureState) {
+export async function checkoutLargeCapture(size: number, state: LargeCaptureState, ackVersion?: string) {
   const { data } = await json("/payments/large-media", {
     fileSize: size, mimeType: "application/wacz", operationId: state.checkoutOperationId,
+    ...(ackVersion ? { acknowledgedWithdrawal: true, withdrawalAckVersion: ackVersion } : {}),
   }, state.account);
   const url = new URL(data.url);
   const paidReturn = url.origin === await getAppOrigin() && url.pathname === "/purchase/success" &&

@@ -87,6 +87,29 @@ test('large checkout reuses operation identity and validates redirect', async ()
   assert.equal(body.operationId, 'stable-payment-op');
   assert.equal(body.fileSize, 200000000);
 });
+test('PV-475: the quote carries the server line and the checkout sends back the version shown', async () => {
+  const ack = { version: 'large-v', text: 'Your 14-day right to cancel ends once it is stored.' };
+  const bodies = [];
+  const api = large(async (url, opts) => {
+    bodies.push({ url, body: JSON.parse(opts.body) });
+    if (url.endsWith('/estimate')) return response(200, { estimate: { pricing: 'dynamic', quote: { amountCents: 1234 }, withdrawalAck: ack } });
+    return response(200, { url: 'https://checkout.stripe.com/c/pay', orderId: 'o', sessionId: 's', quote: { amountCents: 1234 } });
+  });
+  const quote = await api.quoteLargeCapture(200000000, 'account');
+  assert.equal(quote.amountCents, 1234);
+  assert.equal(quote.included, false);
+  assert.equal(quote.withdrawalAck.version, 'large-v');
+  assert.equal(quote.withdrawalAck.text, ack.text);
+  await api.checkoutLargeCapture(200000000, { checkoutOperationId: 'op' }, quote.withdrawalAck.version);
+  const checkout = bodies.filter((b) => b.url.endsWith('/payments/large-media')).at(-1).body;
+  assert.equal(checkout.acknowledgedWithdrawal, true);
+  assert.equal(checkout.withdrawalAckVersion, 'large-v');
+  // Without a line shown, nothing is acknowledged on the customer's behalf.
+  await api.checkoutLargeCapture(200000000, { checkoutOperationId: 'op' });
+  const bare = bodies.filter((b) => b.url.endsWith('/payments/large-media')).at(-1).body;
+  assert.equal('acknowledgedWithdrawal' in bare, false);
+  assert.equal('withdrawalAckVersion' in bare, false);
+});
 
 test('bound API request refuses another account before sending any bytes', async () => {
   const values = new Map([['pvToken','other-token'], ['pvWallet','other-account']]);
