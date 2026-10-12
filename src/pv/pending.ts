@@ -23,6 +23,8 @@ export type LargeCaptureState = {
   checkoutSessionId?: string;
   checkoutUrl?: string;
   amountCents?: number;
+  /** PV-536: orderId is an earlier payment the account already had; no checkout of ours to confirm. */
+  paidEarlier?: boolean;
   sessionId?: string;
   jobId?: string;
 };

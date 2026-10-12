@@ -24,7 +24,7 @@ import { getBalance, uploadWacz, openWsForJob, getCaptureJob, makePermanent } fr
 import { loadPending, savePending, clearPending, type LargeCaptureState } from "./pv/pending";
 
 import { startEmailGrant, loadEmailGrant, exchangeEmailGrant, type EmailGrant } from "./pv/extensionAuth";
-import { quoteLargeCapture, checkoutLargeCapture, largeCapturePaid, uploadLargeCapture } from "./pv/largeCapture";
+import { quoteLargeCapture, checkoutLargeCapture, coveringLargePayment, largeCheckoutState, uploadLargeCapture, ServerRefusal, PAYMENT_GONE } from "./pv/largeCapture";
 import { ARTICLE_BYTES, getPrivateVault, lockArticle, stagePrivateArticle, type LockedArticle } from "./pv/privateArticle";
 import { getLocalOption, setLocalOption, removeLocalOption } from "./localstorage";
 
@@ -706,6 +706,16 @@ class PermavaultPopup extends LitElement {
       } } : {}) });
   }
 
+  /**
+   * PV-536: forget this package's payment and checkout, so the next press
+   * finds a usable payment or opens a new checkout. The package stays.
+   */
+  private releaseLargePayment(state: LargeCaptureState) {
+    Object.assign(state, { orderId: undefined, checkoutSessionId: undefined, checkoutUrl: undefined, amountCents: undefined,
+      paidEarlier: undefined, checkoutOperationId: crypto.randomUUID(), operationId: crypto.randomUUID() });
+    this.largeQuote = null;
+  }
+
   async onLargeCapture() {
     if (this.largeBusy || !this.waczBlob || !this.walletAddress || this.pendingAccountMismatch) return;
     this.largeBusy = true;
@@ -721,6 +731,16 @@ class PermavaultPopup extends LitElement {
         await this.persistPending();
       }
       const state = this.largeState;
+      if (!state.sessionId && !state.orderId) {
+        // PV-536: this package's own unused payment is used, after asking.
+        const covering = await coveringLargePayment(this.waczBlob.size, this.walletAddress);
+        if (covering) {
+          if (!window.confirm("An earlier payment covers this package, so there is nothing more to pay. Press OK to use it and upload now.")) return;
+          Object.assign(state, { orderId: covering, paidEarlier: true });
+          this.largeQuote = null;
+          await this.persistPending();
+        }
+      }
       if (!state.sessionId) {
         const quote = state.orderId ? { amountCents: state.amountCents || 0, included: false } : await quoteLargeCapture(this.waczBlob.size, this.walletAddress);
         this.largeQuote = quote.amountCents;
@@ -734,15 +754,30 @@ class PermavaultPopup extends LitElement {
               ? `This measured package costs ${price}.\n\n${ack.text}\n\nPress OK to pay and preserve now. The final total is shown before you pay.`
               : `This measured package costs ${price}. Continue to checkout? The final total is shown before you pay.`;
             if (!window.confirm(ask)) return;
-            Object.assign(state, await checkoutLargeCapture(this.waczBlob.size, state, ack?.version));
-            this.largeQuote = state.amountCents ?? null;
+            const checkout = await checkoutLargeCapture(this.waczBlob.size, state, ack?.version);
+            // A checkout of our own never carries an earlier payment's flag.
+            Object.assign(state, { paidEarlier: undefined }, checkout);
+            if ("paidEarlier" in checkout) this.largeQuote = null;
             await this.persistPending();
-            this.openTab(state.checkoutUrl!);
-            return;
+            if (!("paidEarlier" in checkout)) {
+              this.largeQuote = state.amountCents ?? null;
+              this.openTab(state.checkoutUrl!);
+              return;
+            }
           }
-          if (!(await largeCapturePaid(state))) {
-            this.errorMsg = "Payment is not confirmed yet. Finish the existing checkout, then continue this package. No new payment was created.";
-            return;
+          if (!state.paidEarlier) {
+            const checkout = await largeCheckoutState(state);
+            if (checkout === "closed") {
+              // PV-536: that checkout closed unpaid; the next press opens a new one.
+              this.releaseLargePayment(state);
+              await this.persistPending();
+              this.errorMsg = "That checkout closed without a payment, so nothing was charged. Press Continue with this package to pay.";
+              return;
+            }
+            if (checkout !== "paid") {
+              this.errorMsg = "Payment is not confirmed yet. Finish the existing checkout, then continue this package. No new payment was created.";
+              return;
+            }
           }
         }
       }
@@ -754,7 +789,15 @@ class PermavaultPopup extends LitElement {
       else this.completeCapture(result.json);
     } catch (error) {
       this.phase = "review-capture";
-      this.errorMsg = error instanceof Error ? error.message : "Upload paused. Your exact package is retained.";
+      if (error instanceof ServerRefusal && error.code && PAYMENT_GONE.has(error.code) && this.largeState && !this.largeState.sessionId) {
+        // PV-536: the payment it was to use was used or taken meanwhile. Let it
+        // go, so the next press looks again instead of repeating the refusal.
+        this.releaseLargePayment(this.largeState);
+        await this.persistPending();
+        this.errorMsg = "The payment this package was going to use is no longer free. Nothing more was charged. Press Continue with this package to check again.";
+      } else {
+        this.errorMsg = error instanceof Error ? error.message : "Upload paused. Your exact package is retained.";
+      }
     } finally { this.largeBusy = false; }
   }
 
@@ -1663,7 +1706,8 @@ class PermavaultPopup extends LitElement {
               : "Eligible article saves are held free for 7 days. Making a save permanent costs $0.99."}
             Your package is retained in this browser while you arrange payment.</p>
           ${this.pendingAccount === "" && this.walletAddress ? html`<button class="secondary" @click=${this.onClaimLocalCapture}>Use local package with this account</button>` : ""}
-          ${this.largeQuote !== null ? html`<p>Total: $${(this.largeQuote / 100).toFixed(2)}</p>` : ""}
+          ${this.largeState?.paidEarlier ? html`<p>Covered by an earlier payment. Nothing more to pay.</p>` : ""}
+          ${this.largeQuote !== null && !this.largeState?.paidEarlier ? html`<p>Total: $${(this.largeQuote / 100).toFixed(2)}</p>` : ""}
           ${this.errorMsg ? html`<p class="error-text">${this.errorMsg}</p>` : ""}
           ${this.walletAddress && !this.pendingAccountMismatch
             ? html`<button class="primary" ?disabled=${this.largeBusy} @click=${this.uploadCapture}>${this.largeBusy ? "Preparing package..." : "Continue with this package"}</button>` : ""}
