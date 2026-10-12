@@ -8,6 +8,16 @@ const path = require('node:path');
 // Exercise the actual popup methods without a browser or network. Lit's
 // template tag is flattened only so result copy can be inspected.
 function popup(confirm = () => true, result = { status: 202, json: { jobId: "job" } }) {
+  class ServerRefusal extends Error { constructor(message, status, code) { super(message); this.status = status; this.code = code; } }
+  const large = {
+    ServerRefusal,
+    PAYMENT_GONE: new Set(['LARGE_MEDIA_ORDER_REQUIRED', 'ORDER_IN_USE', 'ORDER_SIZE_MISMATCH']),
+    coveringLargePayment: async () => null,
+    quoteLargeCapture: async () => ({ amountCents: 999, included: false }),
+    checkoutLargeCapture: async () => ({ orderId: 'order', checkoutSessionId: 'session', checkoutUrl: 'https://checkout.stripe.com/test', amountCents: 999 }),
+    largeCheckoutState: async () => 'waiting',
+    uploadLargeCapture: async () => ({ status: 202, json: { jobId: 'job' } }),
+  };
   let pending;
   let handlers;
   let uploads = 0;
@@ -38,7 +48,7 @@ function popup(confirm = () => true, result = { status: 202, json: { jobId: "job
     require(name) {
       if (name === 'lit') return { LitElement: class {}, html: template, css: template };
       if (name === './pv/extensionAuth') return { loadEmailGrant: async () => null };
-      if (name === './pv/largeCapture') return { quoteLargeCapture: async () => ({ amountCents: 999, included: false }), checkoutLargeCapture: async () => ({ orderId: 'order', checkoutSessionId: 'session', checkoutUrl: 'https://checkout.stripe.com/test', amountCents: 999 }), uploadLargeCapture: async () => ({ status: 202, json: { jobId: 'job' } }) };
+      if (name === './pv/largeCapture') return large;
       if (name === './pv/api') return {
         uploadWacz: async () => { uploads++; return result; },
         makePermanent: async () => 'https://checkout.stripe.com/test',
@@ -67,7 +77,7 @@ function popup(confirm = () => true, result = { status: 202, json: { jobId: "job
   const instance = new exports.PermavaultPopup();
   instance.walletAddress = 'account';
   instance.refreshBalance = async () => {};
-  return { serverExpiryDate: exports.serverExpiryDate, instance, handlers: () => handlers, uploads: () => uploads, privateUploads: () => privateUploads, pending: () => pending, local,
+  return { serverExpiryDate: exports.serverExpiryDate, instance, large, handlers: () => handlers, uploads: () => uploads, privateUploads: () => privateUploads, pending: () => pending, local,
     ports: () => ports,
     setJobStatus: value => { jobStatus = value; }, setWsReject: value => { wsReject = value; }, setWsHang: value => { wsHang = value; },
     runTimer: async delay => { const callback = timers.get(delay); assert.ok(callback, `timer ${delay} exists`); await callback(); },
@@ -629,3 +639,84 @@ test('server expiry preserves UTC across a local date boundary and explicit ISO 
     assert.match(instance.renderDone(), /server did not provide an expiry/);
   } finally { if (prior === undefined) delete process.env.TZ; else process.env.TZ = prior; }
 });
+
+test('PV-536: a payment the account already has for this package is used: no price question, no checkout', async () => {
+  const asked = [];
+  const harness = popup((text) => { asked.push(text); return true; });
+  let uploadedWith;
+  harness.large.coveringLargePayment = async () => 'earlier-order';
+  harness.large.quoteLargeCapture = async () => assert.fail('priced a package that is already paid');
+  harness.large.checkoutLargeCapture = async () => assert.fail('opened a checkout for a package that is already paid');
+  harness.large.uploadLargeCapture = async (_capture, state) => { uploadedWith = { ...state }; return { status: 202, json: { jobId: 'job' } }; };
+  harness.instance.waczBlob = new Blob(['large package']);
+  harness.instance.destinationAccepted = true;
+  harness.instance.openTab = () => assert.fail('opened a tab');
+  harness.instance.trackUploadJob = () => new Promise(() => {});
+  await harness.instance.onLargeCapture();
+  assert.equal(uploadedWith.orderId, 'earlier-order');
+  assert.equal(uploadedWith.paidEarlier, true);
+  // Asked once, about using the payment, never about a price.
+  assert.equal(asked.filter((text) => /costs/.test(text)).length, 0);
+  assert.equal(asked.filter((text) => /An earlier payment covers this package/.test(text)).length, 1);
+  assert.equal(harness.instance.phase, 'uploading');
+});
+
+test('PV-536: declining to use the earlier payment changes nothing', async () => {
+  const harness = popup((text) => !/An earlier payment covers this package/.test(text));
+  harness.large.coveringLargePayment = async () => 'earlier-order';
+  harness.large.uploadLargeCapture = async () => assert.fail('uploaded after the customer declined');
+  harness.instance.waczBlob = new Blob(['large package']);
+  harness.instance.destinationAccepted = true;
+  await harness.instance.onLargeCapture();
+  assert.equal(harness.instance.largeState.orderId, undefined);
+});
+
+test('PV-536: a checkout the server answers with an earlier payment uploads against it, without a tab', async () => {
+  const harness = popup(() => true);
+  let uploadedWith;
+  harness.large.checkoutLargeCapture = async () => ({ orderId: 'named-order', paidEarlier: true });
+  harness.large.uploadLargeCapture = async (_capture, state) => { uploadedWith = { ...state }; return { status: 202, json: { jobId: 'job' } }; };
+  harness.instance.waczBlob = new Blob(['large package']);
+  harness.instance.destinationAccepted = true;
+  harness.instance.openTab = () => assert.fail('opened a tab');
+  harness.instance.trackUploadJob = () => new Promise(() => {});
+  await harness.instance.onLargeCapture();
+  assert.equal(uploadedWith.orderId, 'named-order');
+  assert.equal(harness.instance.phase, 'uploading');
+});
+
+test('PV-536: a checkout that closed unpaid is let go, so the next press opens a new one', async () => {
+  const harness = popup(() => true);
+  harness.large.largeCheckoutState = async () => 'closed';
+  harness.large.uploadLargeCapture = async () => assert.fail('uploaded against a checkout that closed unpaid');
+  harness.instance.waczBlob = new Blob(['large package']);
+  harness.instance.destinationAccepted = true;
+  harness.instance.largeState = { account: 'account', operationId: 'capture-op', checkoutOperationId: 'old-checkout-op', orderId: 'closed-order', checkoutSessionId: 'cs_closed', checkoutUrl: 'https://checkout.stripe.com/c', amountCents: 999 };
+  await harness.instance.onLargeCapture();
+  const state = harness.instance.largeState;
+  assert.equal(state.orderId, undefined);
+  assert.equal(state.checkoutSessionId, undefined);
+  assert.notEqual(state.checkoutOperationId, 'old-checkout-op');
+  assert.match(harness.instance.errorMsg, /closed without a payment, so nothing was charged\. Press Continue with this package to pay\./);
+});
+
+test('PV-536: a payment taken by another upload meanwhile is let go, so the next press looks again', async () => {
+  const harness = popup(() => true);
+  harness.large.coveringLargePayment = async () => 'earlier-order';
+  harness.large.uploadLargeCapture = async () => { throw new harness.large.ServerRefusal('This payment is already being used by an upload in progress.', 409, 'ORDER_IN_USE'); };
+  harness.instance.waczBlob = new Blob(['large package']);
+  harness.instance.destinationAccepted = true;
+  await harness.instance.onLargeCapture();
+  const state = harness.instance.largeState;
+  assert.equal(state.orderId, undefined);
+  assert.equal(state.paidEarlier, undefined);
+  assert.match(harness.instance.errorMsg, /no longer free\. Nothing more was charged/);
+  // The next press looks for a payment again and, finding none, prices the package.
+  let priced = false;
+  harness.large.coveringLargePayment = async () => null;
+  harness.large.quoteLargeCapture = async () => { priced = true; return { amountCents: 999, included: false }; };
+  harness.instance.openTab = () => {};
+  await harness.instance.onLargeCapture();
+  assert.equal(priced, true);
+});
+

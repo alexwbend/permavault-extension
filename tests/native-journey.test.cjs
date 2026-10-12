@@ -111,6 +111,34 @@ test('PV-475: the quote carries the server line and the checkout sends back the 
   assert.equal('withdrawalAckVersion' in bare, false);
 });
 
+test("PV-536: only this package's own earlier payment (the same size) is found, and a named one is used", async () => {
+  const api = large(async (url) => {
+    if (url.endsWith('/large-media/pending')) return response(200, { orders: [
+      { orderId: 'too-small', sizeBytes: 100 }, { orderId: 'big', sizeBytes: 900 }, { orderId: 'same', sizeBytes: 400 }, { orderId: '', sizeBytes: 600 },
+    ] });
+    return response(409, { error: 'LARGE_MEDIA_ALREADY_PAID', message: 'An earlier payment already covers this file.', orderId: 'named-order' });
+  });
+  assert.equal(await api.coveringLargePayment(400, 'account'), 'same');
+  // A bigger payment was bought for another file and stays with it.
+  assert.equal(await api.coveringLargePayment(500, 'account'), null);
+  assert.equal(await api.coveringLargePayment(600, 'account'), null);
+  const checkout = await api.checkoutLargeCapture(400, { checkoutOperationId: 'op', account: 'account' }, 'large-v');
+  assert.equal(checkout.orderId, 'named-order');
+  assert.equal(checkout.paidEarlier, true);
+});
+test('PV-536: a checkout reads as paid, closed unpaid, or still waiting', async () => {
+  const answers = { cs_paid: { status: 'paid', kind: 'large-media', orderId: 'o' }, cs_closed: { status: 'expired', kind: 'unknown' }, cs_wait: { status: 'pending', kind: 'large-media', orderId: 'o' } };
+  const api = large(async (url) => response(200, answers[new URL(url, 'https://x').searchParams.get('sessionId')]));
+  assert.equal(await api.largeCheckoutState({ checkoutSessionId: 'cs_paid', orderId: 'o' }), 'paid');
+  assert.equal(await api.largeCheckoutState({ checkoutSessionId: 'cs_closed', orderId: 'o' }), 'closed');
+  assert.equal(await api.largeCheckoutState({ checkoutSessionId: 'cs_wait', orderId: 'o' }), 'waiting');
+});
+test('PV-536: another refusal of the checkout still reads as its message, and carries its code', async () => {
+  const api = large(async () => response(409, { error: 'LARGE_MEDIA_PAYMENT_CONFIRMING', message: 'Your earlier payment for this file went through.', sessionId: 'cs_x' }));
+  await assert.rejects(api.checkoutLargeCapture(400, { checkoutOperationId: 'op' }, 'large-v'),
+    (error) => /earlier payment for this file went through/.test(error.message) && error.code === 'LARGE_MEDIA_PAYMENT_CONFIRMING' && error.status === 409);
+});
+
 test('bound API request refuses another account before sending any bytes', async () => {
   const values = new Map([['pvToken','other-token'], ['pvWallet','other-account']]);
   const api = moduleFor('auth.ts', { '../localstorage': {
