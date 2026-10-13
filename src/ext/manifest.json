@@ -1,6 +1,6 @@
 {
   "name": "Permavault",
-  "description": "Record pages in your browser, keep a local archive, and choose public or private storage with a verifiable capture record.",
+  "description": "Capture pages before they change. Keep the page and its proof.",
   "version": "$VERSION",
   "permissions": [
     "debugger",

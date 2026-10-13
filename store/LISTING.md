@@ -1,6 +1,6 @@
 # Chrome Web Store listing copy
 
-Submission draft for the reviewed release candidate. Publish only after the matching website sign-in endpoints are deployed and the live journey is checked.
+Listing copy for the matching release. Check the exact extension package and website journey before applying it in the Store console. Uploading a package, submitting review and publishing are separate steps.
 
 ## Name
 
@@ -8,41 +8,46 @@ Permavault
 
 ## Short description
 
-Record pages in your browser, keep a local archive, and choose public or private storage with a verifiable capture record.
+Capture pages before they change. Keep the page and its proof.
 
 ## Detailed description
 
-Keep a copy of a page you can access in your browser. Permavault records the selected page in your own browser session and keeps an archive in the extension's local library.
+Capture it before it changes or disappears.
 
-HOW IT WORKS
+A bookmark keeps a link. Permavault helps you keep what was there. Preserve a source for your reporting, a page for your case, or a reference for your research, directly from your browser.
 
-1. Sign in by email on the Permavault website, then approve this extension with the code shown in its popup. Existing key-file accounts are also supported.
-2. Open the page you want to keep. Choose a public save or turn on Private, then review the notice about logged-in content and where the archive will go.
-3. The capture engine records the page. Some sites or resources may not record completely; this is not a promise of an exact copy of every page.
-4. Eligible public article saves up to 10 MB are held temporarily for 7 days without payment. The result shows the server's expiry and an option to make the save permanent for $0.99. Unpaid saves are deleted at expiry.
-5. Private article saves up to 10 MB are locked in the extension before upload and held temporarily for 7 days. Making one permanent costs $1.99. A Private Vault and saved Recovery Kit are required. Your local library retains the readable original on this device.
-6. Public captures over 10 MB and up to 100 MB use one prepaid capture, available individually for $4.99 or in packs. Larger supported public captures show a size-based total before payment. Complete checkout, then reopen the popup and continue the same saved package. Closing the popup pauses its upload; the package remains locally available.
+Keep the page. Keep the proof.
 
-YOUR RECORD AND ITS LIMITS
+- Capture pages through your own signed-in session, including subscription content you can access.
+- Keep a portable web archive in your local library and download a copy for compatible replay tools. Local recording and export are free, with no account required.
+- Choose permanent storage for the captures that matter. The archive and its proof are stored on Arweave, a decentralized network designed for permanence. Download the evidence package to check integrity without relying on Permavault's website.
+- Permanent saves include a signed capture record. Independent timestamping through OpenTimestamps is included in the service; check History for storage and proof confirmation status.
 
-A capture completed by the Permavault upload service has a signed record identifying it as captured in your browser session. Permavault attests receipt and sealing; it did not independently fetch the original page. A signature or timestamp alone does not prove the source was truthful or establish authorship. Screenshots and exhibit PDFs depend on what could be captured and the upload path; they are not promised for every capture. Check History for storage availability and proof status. An accepted upload or disconnected progress display is not confirmation of permanent storage.
+Start in a few steps
 
-PRIVACY AND STORAGE CHOICES
+Pin the extension, open your page, and start recording. To upload, sign in by email and approve the extension using its popup code. Review the storage choice first: eligible article saves upload automatically after recording; larger regular captures ask before spending.
 
-For a public save, uploaded content is readable by Permavault. Making it permanent publishes the readable archive on Arweave; anyone with its location can read it, and it cannot be deleted from that network. Record only material you are willing and entitled to publish.
+Pay once for what you keep
 
-For a private article save, the extension locks the archive before upload. Permavault stores the locked copy and cannot open it on its own. A permanent private save remains locked, but its existence, approximate size, date and the fact your account made a capture are visible. Keep your Recovery Kit: if you lose all working devices and the kit, you cannot open the save. Pages you select can contain logged-in, personal or sensitive content.
+- Article saves up to 10 MB: free temporary storage for 7 days, then $0.99 per regular save or $1.99 per private save to make permanent.
+- Regular captures over 10 MB and up to 100 MB: $4.99 individually, with packs available.
+- Larger supported regular captures: one size-based total, shown before payment.
 
-You can record a local package without signing in, download it, and choose later whether to upload it. Local copies and retained upload packages stay in this browser. The extension does not continuously record your browsing. The popup reads the active tab's address and title to show the page you can record. Account authorization contacts Permavault separately from recording.
+No subscription. Unpaid temporary saves are deleted after 7 days. Local copies stay on this device until removed or the extension's data is cleared.
 
-The extension is free to install. Storage and other services are paid in USD. Permanent storage is designed for permanence; a particular gateway or future retrieval is not guaranteed.
+Choose who can read the stored copy
 
-Privacy policy: https://app.permavault.xyz/privacy
+Regular uploads are readable by Permavault. Making them permanent publishes the readable archive; anyone with its location can read it, and it cannot be deleted. Record only material you are willing and entitled to publish.
 
-OPEN SOURCE
+Private article saves are locked before upload, so Permavault cannot open them on its own. Set up your Private Vault and save and check your Recovery Kit first. The local original remains readable on this device. Existence, approximate size, date and account association remain visible. Losing all working devices and the kit means losing access.
 
-Permavault is open source under the AGPL and builds on Webrecorder's ArchiveWeb.page capture engine. Source: https://github.com/alexwbend/permavault-extension
+Recordings can be incomplete. Review the result before relying on it. The signed record attests receipt and sealing, not an independent visit to the source, authorship or truth. Recording starts only when you choose it. The popup reads the active tab's address and title.
+
+Privacy: https://app.permavault.xyz/privacy
+
+Open source under AGPL-3.0-or-later, built on Webrecorder's ArchiveWeb.page recording engine.
+Source: https://github.com/alexwbend/permavault-extension
 
 ## Console metadata
 
-Category: Productivity. Language: English. Use the icon from the exact candidate ZIP. Verify its required dimensions in the console before uploading.
+Category: Productivity. Language: English. Use the icon from the matching release ZIP and check its dimensions in the console.

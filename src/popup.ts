@@ -1337,11 +1337,10 @@ class PermavaultPopup extends LitElement {
         letter-spacing: 0.01em;
       }
 
-      .brand-dot {
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        background: var(--pv-primary);
+      .brand-mark {
+        width: 20px;
+        height: 20px;
+        flex-shrink: 0;
       }
 
       .account {
@@ -1654,7 +1653,7 @@ class PermavaultPopup extends LitElement {
     return html`
       <header>
         <div class="brand">
-          <span class="brand-dot"></span>
+          <img class="brand-mark" src="./permavault-mark.svg" alt="" />
           <span>Permavault</span>
         </div>
         ${signedIn
