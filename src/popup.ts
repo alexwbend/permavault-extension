@@ -2,7 +2,7 @@
 // current tab with the existing engine, package the WACZ and upload it to
 // the Permavault vault.
 
-import { LitElement, html, css } from "lit";
+import { LitElement, html, css, svg } from "lit";
 
 import {
   BEHAVIOR_WAIT_LOAD,
@@ -27,6 +27,35 @@ import { startEmailGrant, loadEmailGrant, exchangeEmailGrant, type EmailGrant } 
 import { quoteLargeCapture, checkoutLargeCapture, coveringLargePayment, largeCheckoutState, uploadLargeCapture, ServerRefusal, PAYMENT_GONE } from "./pv/largeCapture";
 import { ARTICLE_BYTES, VAULT_SETUP_MESSAGE, getPrivateVault, lockArticle, stagePrivateArticle, type LockedArticle } from "./pv/privateArticle";
 import { getLocalOption, setLocalOption, removeLocalOption } from "./localstorage";
+
+// Lucide icons (lucide 0.460), inline so the popup loads nothing else. Their
+// stroke comes from the .ic styles (K5 Graphite, option I).
+const ICONS = {
+  alert: svg`<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path>`,
+  check: svg`<path d="M20 6 9 17l-5-5"></path>`,
+  chevron: svg`<path d="m9 18 6-6-6-6"></path>`,
+  clock: svg`<circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline>`,
+  download: svg`<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line>`,
+  external: svg`<path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>`,
+  folder: svg`<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path>`,
+  globe: svg`<circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><path d="M2 12h20"></path>`,
+  hourglass: svg`<path d="M5 22h14"></path><path d="M5 2h14"></path><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"></path><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"></path>`,
+  info: svg`<circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path>`,
+  key: svg`<path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4"></path><path d="m21 2-9.6 9.6"></path><circle cx="7.5" cy="15.5" r="5.5"></circle>`,
+  lock: svg`<rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>`,
+  mail: svg`<rect width="20" height="16" x="2" y="4" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path>`,
+  package: svg`<path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"></path><path d="M12 22V12"></path><path d="m3.3 7 7.703 4.734a2 2 0 0 0 1.994 0L20.7 7"></path><path d="m7.5 4.27 9 5.15"></path>`,
+  record: svg`<circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="1"></circle>`,
+  refresh: svg`<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path><path d="M8 16H3v5"></path>`,
+  upload: svg`<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" x2="12" y1="3" y2="15"></line>`,
+};
+
+type IconName = keyof typeof ICONS;
+
+function icon(name: IconName, size = 16, extra = "") {
+  const cls = `ic${size <= 14 ? " small" : ""}${extra ? ` ${extra}` : ""}`;
+  return html`<svg class="${cls}" width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`;
+}
 
 const STANDARD_BYTES = 100 * 1024 * 1024;
 
@@ -1311,18 +1340,29 @@ class PermavaultPopup extends LitElement {
   static get styles() {
     return css`
       :host {
-        --pv-primary: #16352b;
-        --pv-primary-soft: #f3f0e8;
-        --pv-button: #16352b;
-        --pv-button-hover: #23513e;
-        --pv-text: #1b1b16;
-        --pv-muted: #6b6a5f;
-        --pv-border: #e7e2d3;
+        --pv-ink: #1d1d1f;
+        --pv-ink2: #3a3a3c;
+        --pv-muted: #56565b;
+        --pv-icon-muted: #86868b;
+        --pv-accent: #48484a;
+        --pv-fill: rgba(118, 118, 128, 0.12);
+        --pv-fill2: rgba(118, 118, 128, 0.08);
+        --pv-line: rgba(0, 0, 0, 0.08);
+        --pv-ok: #28a745;
+        --pv-fail-bg: #fdecec;
+        --pv-fail-ink: #b42318;
+        --pv-card-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04), 0 18px 40px -22px rgba(0, 0, 0, 0.22);
+        --pv-dark-card: radial-gradient(90% 70% at 0% 0%, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0) 60%),
+          radial-gradient(120% 90% at 100% 100%, rgba(142, 142, 147, 0.35) 0%, rgba(0, 0, 0, 0) 70%),
+          linear-gradient(155deg, #2c2c2e 0%, #1c1c1e 100%);
 
         display: block;
         font-family:
-          system-ui,
           -apple-system,
+          BlinkMacSystemFont,
+          "SF Pro Text",
+          "Geist",
+          system-ui,
           "Segoe UI",
           Roboto,
           "Helvetica Neue",
@@ -1330,8 +1370,13 @@ class PermavaultPopup extends LitElement {
           sans-serif;
         font-size: 14px;
         line-height: 1.45;
-        color: var(--pv-text);
-        background: #fbf9f4;
+        letter-spacing: -0.006em;
+        color: var(--pv-ink);
+        -webkit-font-smoothing: antialiased;
+        background:
+          radial-gradient(70% 55% at 100% 0%, rgba(199, 201, 209, 0.55) 0%, rgba(199, 201, 209, 0) 70%),
+          radial-gradient(60% 50% at 0% 0%, rgba(218, 219, 224, 0.45) 0%, rgba(218, 219, 224, 0) 70%),
+          linear-gradient(180deg, #e3e4e8 0%, #eff0f2 42%, #f5f5f7 100%);
       }
 
       * {
@@ -1344,41 +1389,61 @@ class PermavaultPopup extends LitElement {
         min-height: 200px;
       }
 
-      header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 12px 14px;
-        border-bottom: 1px solid var(--pv-border);
+      /* Lucide icons, option I: hairline strokes with square ends. */
+      .ic {
+        flex: none;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.5;
+        stroke-linecap: square;
+        stroke-linejoin: miter;
       }
 
-      .brand {
+      .ic.small {
+        stroke-width: 1.75;
+      }
+
+      .ic.solid {
+        fill: currentColor;
+      }
+
+      header {
+        margin: 8px 8px 0;
+        height: 50px;
+        flex: none;
+        padding: 0 8px 0 12px;
         display: flex;
         align-items: center;
         gap: 8px;
-        font-size: 16px;
-        font-weight: 700;
-        letter-spacing: 0.01em;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.72);
+        backdrop-filter: blur(40px) saturate(1.8);
+        box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.09), inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 10px 24px -16px rgba(0, 0, 0, 0.3);
       }
 
-      .brand-mark {
-        width: 20px;
-        height: 20px;
-        flex-shrink: 0;
+      .brand {
+        display: block;
+        height: 22px;
+        width: auto;
+        margin: 0 -3px;
+        flex: none;
       }
 
       .account {
+        flex: 1;
+        min-width: 0;
         display: flex;
         align-items: center;
+        justify-content: flex-end;
         gap: 8px;
       }
 
       .wallet {
-        max-width: 170px;
+        min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        font-size: 12px;
+        font-size: 12.5px;
         color: var(--pv-muted);
       }
 
@@ -1386,137 +1451,495 @@ class PermavaultPopup extends LitElement {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 16px;
-        height: 16px;
-        margin-left: 2px;
-        border-radius: 50%;
-        border: 1px solid var(--pv-muted);
-        color: var(--pv-muted);
-        font-size: 11px;
-        font-weight: 700;
-        font-style: normal;
-        line-height: 1;
+        width: 24px;
+        height: 24px;
+        flex: none;
         vertical-align: middle;
+        border-radius: 50%;
+        color: var(--pv-icon-muted);
         cursor: help;
+      }
+
+      .info:hover,
+      .info:focus-visible {
+        color: var(--pv-ink2);
       }
 
       main {
         flex: 1;
-        padding: 14px;
+        min-height: 0;
+        padding: 10px 10px 0;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
       }
 
       footer {
+        flex: none;
+        padding: 10px;
         display: flex;
-        justify-content: center;
-        gap: 6px;
-        padding: 8px 14px 10px;
-        border-top: 1px solid var(--pv-border);
-        font-size: 12px;
-        color: var(--pv-muted);
+        gap: 8px;
       }
 
       button {
         font: inherit;
+        letter-spacing: -0.008em;
         cursor: pointer;
-        border-radius: 10px;
-        border: 1px solid transparent;
+        border: 0;
       }
 
       button:disabled {
-        opacity: 0.55;
+        opacity: 0.45;
         cursor: default;
       }
 
-      .primary {
-        display: block;
+      button:focus-visible,
+      .file-button:focus-within,
+      .private-choice:focus-within,
+      summary:focus-visible,
+      .info:focus-visible {
+        outline: 2px solid var(--pv-accent);
+        outline-offset: 2px;
+      }
+
+      .primary,
+      .secondary,
+      .tint {
         width: 100%;
-        padding: 10px 14px;
-        background: var(--pv-button);
-        color: #fff;
-        font-weight: 600;
-        border: none;
-      }
-
-      .primary:not(:disabled):hover {
-        background: var(--pv-button-hover);
-      }
-
-      .primary.big {
-        padding: 13px 14px;
-        font-size: 15px;
-      }
-
-      .private-choice {
-        display: flex;
-        align-items: flex-start;
-        gap: 10px;
-        padding: 12px;
-        margin: 12px 0;
-        border: 1px solid var(--pv-border);
-        border-radius: 8px;
-        background: var(--pv-primary-soft);
-        cursor: pointer;
-      }
-
-      .private-choice input { accent-color: var(--pv-primary); margin-top: 3px; }
-      .private-choice span { display: flex; flex-direction: column; gap: 2px; }
-      .private-choice strong { font-weight: 700; }
-      .private-choice small { color: var(--pv-muted); line-height: 1.4; }
-
-      .secondary {
-        display: block;
-        width: 100%;
-        padding: 9px 14px;
-        margin-top: 8px;
-        background: #fbf9f4;
-        color: var(--pv-text);
-        border-color: var(--pv-border);
-      }
-
-      .secondary:not(:disabled):hover {
-        background: var(--pv-primary-soft);
-      }
-
-      .link {
-        background: none;
-        border: none;
-        padding: 0;
-        color: var(--pv-muted);
-        font-size: 12px;
-        text-decoration: underline;
-      }
-
-      .link:hover {
-        color: var(--pv-text);
-      }
-
-      .link.signout {
+        height: 44px;
+        padding: 0 20px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        border-radius: 9px;
+        font-size: 14.5px;
+        font-weight: 560;
+        white-space: nowrap;
         text-decoration: none;
       }
 
-      .tagline {
-        margin: 2px 0 14px;
+      .primary {
+        color: #fff;
+        background: linear-gradient(180deg, #333336 0%, #1d1d1f 60%, #18181a 100%);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 0 0 0.5px #000, 0 1px 3px -1px rgba(0, 0, 0, 0.25);
+      }
+
+      .primary.dark {
+        background:
+          radial-gradient(90% 140% at 0% 0%, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0) 60%),
+          linear-gradient(180deg, #303033 0%, #161618 100%);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 0 0 0.5px #000, 0 4px 10px -6px rgba(0, 0, 0, 0.4);
+      }
+
+      .primary:not(:disabled):hover {
+        background: linear-gradient(180deg, #3a3a3d 0%, #262628 60%, #1d1d1f 100%);
+      }
+
+      /* The icon sits in its own compartment behind a hairline. */
+      .primary .lead {
+        width: 44px;
+        height: 44px;
+        margin-left: -20px;
+        flex: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.2);
+      }
+
+      .secondary {
+        color: var(--pv-ink);
+        background: linear-gradient(180deg, #fff 0%, #f8f8f9 100%);
+        box-shadow: inset 0 0 0 1px rgba(29, 29, 31, 0.28), 0 1px 1px rgba(0, 0, 0, 0.04);
+      }
+
+      .secondary:not(:disabled):hover,
+      .tint:not(:disabled):hover {
+        background: #f1f1f3;
+      }
+
+      .tint {
+        color: var(--pv-ink);
+        background: linear-gradient(180deg, #f4f4f6 0%, #ededf0 100%);
+        box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+      }
+
+      .tint.medium {
+        height: 36px;
+        padding: 0 12px;
+        border-radius: 7px;
+        font-size: 13.5px;
+      }
+
+      .tint.small {
+        width: auto;
+        height: 30px;
+        padding: 0 11px;
+        flex: none;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 510;
+      }
+
+      .stack {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .card {
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: var(--pv-card-shadow);
+      }
+
+      .card.tight {
+        padding: 12px 16px;
+      }
+
+      .tile {
+        width: 36px;
+        height: 36px;
+        flex: none;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(72, 72, 74, 0.1);
+        color: var(--pv-accent);
+      }
+
+      .hero {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        padding-top: 4px;
+        text-align: center;
+      }
+
+      .hero-tile {
+        width: 48px;
+        height: 48px;
+        flex: none;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--pv-ink);
+        background: linear-gradient(180deg, #fff 0%, #f2f2f5 100%);
+        box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.1), inset 0 1px 0 #fff, 0 8px 18px -10px rgba(0, 0, 0, 0.3);
+      }
+
+      .hero-tile.small {
+        width: 40px;
+        height: 40px;
+        border-radius: 7px;
+      }
+
+      .hero-tile.ok {
+        color: #fff;
+        background: linear-gradient(180deg, #34c759 0%, #248a3d 100%);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 10px 22px -10px rgba(36, 138, 61, 0.55);
+      }
+
+      .hero-tile.temp {
+        color: var(--pv-ink);
+        background: linear-gradient(180deg, #ffc23d 0%, #e6a100 100%);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 10px 22px -10px rgba(230, 161, 0, 0.55);
+      }
+
+      .hero-tile.fail {
+        color: #fff;
+        background: linear-gradient(180deg, #e5484d 0%, #b42318 100%);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 10px 22px -10px rgba(180, 35, 24, 0.5);
+      }
+
+      .hero-tile.glass {
+        color: #fff;
+        background: rgba(255, 255, 255, 0.16);
+        box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+      }
+
+      .panel-title {
+        margin: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Geist", system-ui, sans-serif;
+        font-size: 18px;
+        line-height: 23px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+
+      .panel-sub {
+        margin: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        font-size: 13px;
+        line-height: 18px;
         color: var(--pv-muted);
       }
 
-      .file-button {
-        display: block;
-        width: 100%;
-        padding: 10px 14px;
-        text-align: center;
-        background: var(--pv-primary-soft);
-        border: 1px dashed var(--pv-primary);
-        border-radius: 10px;
-        cursor: pointer;
-        font-weight: 600;
+      /* A dark band across the top of a card, for a private result. */
+      .band {
+        margin: -16px -16px 0;
+        padding: 22px 16px 18px;
+        border-radius: 16px 16px 0 0;
+        background: var(--pv-dark-card);
+        color: #fff;
       }
 
-      .file-button input {
+      .band .panel-sub {
+        color: rgba(255, 255, 255, 0.86);
+      }
+
+      .band .info {
+        color: rgba(255, 255, 255, 0.8);
+      }
+
+      .review-head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .review-head .panel-title {
+        flex: 1;
+        justify-content: flex-start;
+        font-size: 17px;
+        line-height: 22px;
+        text-align: left;
+      }
+
+      .facts {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .fact {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 12px;
+        padding: 8px 0;
+      }
+
+      .fact + .fact {
+        border-top: 0.5px solid var(--pv-line);
+      }
+
+      .fact-label {
+        flex: none;
+        font-size: 12.5px;
+        color: var(--pv-muted);
+      }
+
+      .fact-value {
+        min-width: 0;
+        font-size: 13px;
+        text-align: right;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .line {
+        margin: 0;
+        display: flex;
+        align-items: flex-start;
+        gap: 2px;
+        font-size: 12.5px;
+        line-height: 17px;
+        color: var(--pv-ink2);
+      }
+
+      .line.kept {
+        gap: 8px;
+      }
+
+      .line.kept .ic {
+        margin-top: 1px;
+        color: var(--pv-ok);
+        stroke-width: 2.4;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      .more {
+        overflow: hidden;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+      }
+
+      .more button {
+        width: 100%;
+        min-height: 38px;
+        padding: 0 12px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: transparent;
+        color: var(--pv-ink);
+        font-size: 13px;
+        font-weight: 500;
+        text-align: left;
+      }
+
+      .more button + button {
+        box-shadow: inset 0 0.5px 0 rgba(0, 0, 0, 0.08);
+      }
+
+      .more button:hover {
+        background: var(--pv-fill2);
+      }
+
+      .more .ic {
+        color: var(--pv-muted);
+      }
+
+      .more .label {
+        flex: 1;
+      }
+
+      .more .chev {
+        color: var(--pv-icon-muted);
+      }
+
+      .link {
+        padding: 0;
+        background: none;
+        color: var(--pv-ink2);
+        font-size: 12.5px;
+        font-weight: 500;
+        text-decoration: underline;
+        text-decoration-color: rgba(0, 0, 0, 0.25);
+        text-underline-offset: 2px;
+      }
+
+      .link:hover {
+        color: var(--pv-ink);
+      }
+
+      .tagline {
+        margin: 0;
+        font-size: 14.5px;
+        line-height: 20px;
+        color: var(--pv-ink);
+      }
+
+      .helper {
+        margin: -4px 0 0;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 2px;
+        font-size: 12.5px;
+        line-height: 17px;
+        color: var(--pv-muted);
+      }
+
+      .code-box {
+        padding: 12px;
+        border-radius: 14px;
+        background: var(--pv-fill2);
+        font-size: 12.5px;
+        line-height: 17px;
+        color: var(--pv-ink2);
+        text-align: center;
+      }
+
+      .code-box strong {
+        display: block;
+        margin: 4px 0;
+        font: 600 22px ui-monospace, SFMono-Regular, Menlo, monospace;
+        letter-spacing: 0.14em;
+        color: var(--pv-ink);
+      }
+
+      details {
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.6);
+        box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.08);
+      }
+
+      summary {
+        min-height: 40px;
+        padding: 0 14px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        border-radius: 14px;
+        list-style: none;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--pv-ink2);
+      }
+
+      summary::-webkit-details-marker {
         display: none;
       }
 
+      summary .start {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      summary .start .ic {
+        color: var(--pv-muted);
+      }
+
+      summary .chev {
+        color: var(--pv-icon-muted);
+        transition: transform 0.15s ease;
+      }
+
+      details[open] summary .chev {
+        transform: rotate(90deg);
+      }
+
+      .details-body {
+        padding: 0 14px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .file-button {
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        border-radius: 12px;
+        border: 1px dashed rgba(0, 0, 0, 0.22);
+        background: #fff;
+        font-size: 13.5px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .file-button input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+      }
+
       .file-name {
-        margin-top: 6px;
         font-size: 12px;
         color: var(--pv-muted);
         overflow: hidden;
@@ -1525,43 +1948,57 @@ class PermavaultPopup extends LitElement {
       }
 
       .or {
-        margin: 12px 0 6px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
         font-size: 12px;
         color: var(--pv-muted);
-        text-align: center;
+      }
+
+      .or::before,
+      .or::after {
+        content: "";
+        flex: 1;
+        height: 0.5px;
+        background: var(--pv-line);
       }
 
       textarea {
         width: 100%;
-        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-        font-size: 11px;
-        padding: 8px;
-        border: 1px solid var(--pv-border);
-        border-radius: 10px;
+        padding: 10px 12px;
+        border: 0;
+        border-radius: 12px;
+        background: var(--pv-fill2);
+        font: 400 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+        color: var(--pv-ink);
         resize: vertical;
-        margin-bottom: 10px;
-      }
-
-      .helper {
-        margin: 10px 0 0;
-        font-size: 12px;
-        color: var(--pv-muted);
       }
 
       .error-text {
-        margin: 10px 0 0;
-        font-size: 12px;
-        color: hsl(0, 65%, 45%);
+        margin: 0;
+        padding: 11px 13px;
+        border-radius: 12px;
+        background: var(--pv-fail-bg);
+        font-size: 13px;
+        line-height: 18px;
+        color: var(--pv-fail-ink);
       }
 
       .page-card {
-        border: 1px solid var(--pv-border);
-        border-radius: 10px;
-        padding: 10px 12px;
-        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+      }
+
+      .page-text {
+        flex: 1;
+        min-width: 0;
       }
 
       .page-title {
+        font-size: 14.5px;
+        line-height: 19px;
         font-weight: 600;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -1569,22 +2006,129 @@ class PermavaultPopup extends LitElement {
       }
 
       .page-url {
-        font-size: 12px;
+        font-size: 12.5px;
+        line-height: 17px;
         color: var(--pv-muted);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
 
+      .balance-row {
+        display: flex;
+        justify-content: flex-end;
+        padding-top: 12px;
+        border-top: 0.5px solid var(--pv-line);
+      }
+
       .balance {
-        margin-bottom: 12px;
-        font-size: 13px;
+        height: 26px;
+        padding: 0 11px;
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        background: linear-gradient(180deg, #fff 0%, #f6f6f8 100%);
+        box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.13), 0 1px 2px rgba(0, 0, 0, 0.06), inset 0 1px 0 #fff;
+        font-size: 12.5px;
+        font-weight: 600;
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .private-choice {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 14px 12px 12px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: var(--pv-card-shadow);
+        cursor: pointer;
+      }
+
+      .private-choice.on {
+        background: var(--pv-dark-card);
+        color: #fff;
+        box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 12px 26px -12px rgba(0, 0, 0, 0.5);
+      }
+
+      .private-choice input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+      }
+
+      .private-choice .tile {
+        background: var(--pv-fill2);
+        color: var(--pv-ink2);
+      }
+
+      .private-choice.on .tile {
+        background: rgba(255, 255, 255, 0.16);
+        color: #fff;
+        box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+      }
+
+      .private-text {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .private-text strong {
+        font-size: 14.5px;
+        font-weight: 600;
+      }
+
+      .private-text small {
+        font-size: 12.5px;
+        line-height: 17px;
         color: var(--pv-muted);
       }
 
+      .private-choice.on .private-text small {
+        color: rgba(255, 255, 255, 0.84);
+      }
+
+      .switch {
+        width: 42px;
+        height: 26px;
+        flex: none;
+        padding: 2px;
+        display: flex;
+        justify-content: flex-start;
+        border-radius: 999px;
+        background: rgba(120, 120, 128, 0.32);
+        transition: background 0.15s ease;
+      }
+
+      .switch::after {
+        content: "";
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: #fff;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+      }
+
+      .private-choice.on .switch {
+        justify-content: flex-end;
+        background: #fff;
+      }
+
+      .private-choice.on .switch::after {
+        background: #1c1c1e;
+        box-shadow: none;
+      }
+
       .note {
-        margin: 10px 0 0;
-        font-size: 13px;
+        margin: 0;
+        font-size: 12.5px;
+        line-height: 17px;
         color: var(--pv-muted);
         text-align: center;
       }
@@ -1593,26 +2137,39 @@ class PermavaultPopup extends LitElement {
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 10px;
-        padding: 18px 6px;
+        gap: 12px;
+        padding: 14px 0 6px;
         text-align: center;
       }
 
       .status-text {
+        font-size: 15px;
         font-weight: 600;
       }
 
       .sub-status {
-        font-size: 12px;
+        font-size: 12.5px;
         color: var(--pv-muted);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .ring {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #fff;
+        box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.08), 0 10px 22px -12px rgba(0, 0, 0, 0.35);
       }
 
       .spinner {
-        width: 26px;
-        height: 26px;
+        width: 22px;
+        height: 22px;
         border-radius: 50%;
-        border: 3px solid var(--pv-primary-soft);
-        border-top-color: var(--pv-button);
+        border: 2.6px solid var(--pv-fill);
+        border-top-color: var(--pv-accent);
         animation: pv-spin 0.9s linear infinite;
       }
 
@@ -1622,53 +2179,27 @@ class PermavaultPopup extends LitElement {
         }
       }
 
+      @media (prefers-reduced-motion: reduce) {
+        .spinner {
+          animation-duration: 2.4s;
+        }
+      }
+
       .progress {
         width: 100%;
-        height: 8px;
+        height: 6px;
         border-radius: 999px;
-        background: var(--pv-primary-soft);
+        background: var(--pv-fill);
         overflow: hidden;
       }
 
       .progress-fill {
         height: 100%;
-        background: var(--pv-button);
         border-radius: 999px;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0) 60%),
+          linear-gradient(90deg, #a1a1a6 0%, #636366 55%, #3a3a3c 100%);
         transition: width 0.3s ease;
-      }
-
-      .panel {
-        display: flex;
-        flex-direction: column;
-        align-items: stretch;
-        text-align: center;
-      }
-
-      .panel-title {
-        font-size: 16px;
-        font-weight: 700;
-        margin: 6px 0 6px;
-      }
-
-      .panel-sub {
-        margin: 0 0 14px;
-        font-size: 13px;
-        color: var(--pv-muted);
-      }
-
-      .done-mark {
-        align-self: center;
-        width: 34px;
-        height: 34px;
-        border-radius: 50%;
-        background: var(--pv-primary);
-        color: #fff;
-        font-size: 19px;
-        font-weight: 700;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin-bottom: 4px;
       }
     `;
   }
@@ -1697,15 +2228,12 @@ class PermavaultPopup extends LitElement {
 
     return html`
       <header>
-        <div class="brand">
-          <img class="brand-mark" src="./permavault-mark.svg" alt="" />
-          <span>Permavault</span>
-        </div>
+        <img class="brand" src="./permavault-logo.svg" alt="Permavault" />
         ${signedIn
           ? html`
               <div class="account">
                 <span class="wallet" title="${this.accountLabel}">${this.accountLabel}</span>
-                <button class="link signout" @click=${this.onSignOut}>
+                <button class="tint small" @click=${this.onSignOut}>
                   Sign out
                 </button>
               </div>
@@ -1718,16 +2246,25 @@ class PermavaultPopup extends LitElement {
   renderFooter() {
     return html`
       <footer>
-        <button class="link" @click=${this.onOpenVault}>Open Permavault</button>
-        <span>&middot;</span>
-        <button class="link" @click=${this.onOpenLibrary}>Local library</button>
+        <button class="tint medium" @click=${this.onOpenVault}>${icon("external", 16)}Open Permavault</button>
+        <button class="tint medium" @click=${this.onOpenLibrary}>${icon("folder", 16, "solid")}Local library</button>
       </footer>
     `;
   }
 
   /** A short detail behind an (i), so the screen itself stays short. */
   info(text: string) {
-    return html`<span class="info" role="img" tabindex="0" aria-label="${text}" title="${text}">i</span>`;
+    return html`<span class="info" role="img" tabindex="0" aria-label="${text}" title="${text}">${icon("info", 15)}</span>`;
+  }
+
+  /** The main action: its icon sits in a compartment of its own. */
+  lead(name: IconName) {
+    return html`<span class="lead">${icon(name, 18)}</span>`;
+  }
+
+  /** The big tile at the top of a result card. */
+  heroTile(name: IconName, tone = "") {
+    return html`<span class="hero-tile ${tone}" aria-hidden="true">${icon(name, 22)}</span>`;
   }
 
   renderMain() {
@@ -1746,10 +2283,13 @@ class PermavaultPopup extends LitElement {
 
       case "packaging":
         return html`
-          <div class="status-block">
-            <div class="spinner"></div>
-            <div class="status-text">${this.privateSelected ? "Sealing in your browser…" : "Preparing your capture…"}</div>
-          </div>
+          ${this.pageUrl ? this.renderPageCard() : ""}
+          <section class="card">
+            <div class="status-block" role="status">
+              <span class="ring"><span class="spinner"></span></span>
+              <div class="status-text">${this.privateSelected ? "Sealing in your browser…" : "Preparing your capture…"}</div>
+            </div>
+          </section>
         `;
 
       case "uploading":
@@ -1760,31 +2300,41 @@ class PermavaultPopup extends LitElement {
 
       case "out-of-captures":
         return html`
-          <div class="panel">
-            <div class="panel-title">No captures left</div>
-            <p class="panel-sub">Your page is safe in this browser.</p>
-            <button class="primary" @click=${this.onBuyCaptures}>
-              Buy captures
-            </button>
-            <button class="secondary" @click=${this.onTryAgain}>
-              Try again
-            </button>
-          </div>
+          <section class="card">
+            <div class="hero">
+              ${this.heroTile("package")}
+              <div class="panel-title">No captures left</div>
+              <p class="panel-sub">Your page is safe in this browser.</p>
+            </div>
+            <div class="stack">
+              <button class="primary" @click=${this.onBuyCaptures}>
+                ${this.lead("external")}Buy captures
+              </button>
+              <button class="secondary" @click=${this.onTryAgain}>
+                ${icon("refresh", 18)}Try again
+              </button>
+            </div>
+          </section>
         `;
 
       case "error":
       default:
         return html`
-          <div class="panel">
-            <div class="panel-title">We couldn't finish this</div>
-            <p class="panel-sub">
-              ${this.errorMsg || "Your page is safe in this browser."}
-            </p>
-            <button class="primary" @click=${this.onTryAgain}>
-              Try again
-            </button>
-            <button class="secondary" @click=${this.onOpenLibrary}>Open local library</button>
-          </div>
+          <section class="card">
+            <div class="hero">
+              ${this.heroTile("alert", "fail")}
+              <div class="panel-title">We couldn't finish this</div>
+              <p class="panel-sub">
+                ${this.errorMsg || "Your page is safe in this browser."}
+              </p>
+            </div>
+            <div class="stack">
+              <button class="primary" @click=${this.onTryAgain}>
+                ${this.lead("refresh")}Try again
+              </button>
+              <button class="secondary" @click=${this.onOpenLibrary}>${icon("folder", 18)}Open local library</button>
+            </div>
+          </section>
         `;
     }
   }
@@ -1807,55 +2357,69 @@ class PermavaultPopup extends LitElement {
       : html`Over 10 MB, so this uses 1 prepaid capture ($4.99 each). ${this.info("Saved permanently. Anyone with its link can view it.")}`;
     else line = "Free for 7 days, then $0.99 to make permanent.";
     const keepsUntilPaid = canUpload && large && !this.balanceUnlimited && !this.largeState?.orderId && !this.largeState?.paidEarlier;
-    return html`<div class="panel">
-      <div class="panel-title">Your capture is ready ${large ? this.info("Over 100 MB, so it is priced by size. Closing the popup pauses the upload; reopen it to carry on.") : ""}</div>
-      ${this.sourceUrl && !this.privateSelected ? html`<p class="panel-sub">Page: ${this.sourceUrl}</p>` : ""}
-      <p class="panel-sub">Size: ${(size / 1024 / 1024).toFixed(2)} MB</p>
-      ${line ? html`<p class="panel-sub">${line}</p>` : ""}
-      ${keepsUntilPaid ? html`<p class="panel-sub">Kept in this browser until you pay.</p>` : ""}
-      ${this.largeState?.paidEarlier ? html`<p>An earlier payment covers this. Nothing more to pay.</p>` : ""}
-      ${this.largeQuote !== null && !this.largeState?.paidEarlier ? html`<p>Total: $${(this.largeQuote / 100).toFixed(2)}</p>` : ""}
+    return html`<section class="card">
+      <div class="review-head">
+        ${this.heroTile("package", "small")}
+        <div class="panel-title">Your capture is ready</div>
+        ${large ? this.info("Over 100 MB, so it is priced by size. Closing the popup pauses the upload; reopen it to carry on.") : ""}
+      </div>
+      <div class="facts">
+        ${this.sourceUrl && !this.privateSelected ? html`<div class="fact"><span class="fact-label">Page:</span><span class="fact-value" title="${this.sourceUrl}">${this.sourceUrl}</span></div>` : ""}
+        <div class="fact"><span class="fact-label">Size:</span><span class="fact-value">${(size / 1024 / 1024).toFixed(2)} MB</span></div>
+        ${this.largeQuote !== null && !this.largeState?.paidEarlier ? html`<div class="fact"><span class="fact-label">Total:</span><strong class="fact-value">$${(this.largeQuote / 100).toFixed(2)}</strong></div>` : ""}
+      </div>
+      ${line ? html`<p class="line"><span>${line}</span></p>` : ""}
+      ${keepsUntilPaid ? html`<p class="line kept">${icon("check", 14)}Kept in this browser until you pay.</p>` : ""}
+      ${this.largeState?.paidEarlier ? html`<p class="line kept">${icon("check", 14)}An earlier payment covers this. Nothing more to pay.</p>` : ""}
       ${this.errorMsg ? html`<p class="error-text">${this.errorMsg}</p>` : ""}
-      ${claimable ? html`<button class="primary" @click=${this.onClaimLocalCapture}>Add to my account</button>` : ""}
-      ${canUpload
-        ? html`<button class="primary" ?disabled=${this.largeBusy} @click=${this.uploadCapture}>${this.packageButtonLabel}</button>` : ""}
-      ${this.largeState?.checkoutUrl && canUpload ? html`<button class="secondary" @click=${() => this.openTab(this.largeState!.checkoutUrl!)}>Reopen checkout</button>` : ""}
-      ${!this.walletAddress ? html`<button class="primary" @click=${this.onEmailSignIn}>Sign in with email</button>${this.renderEmailGrant()}` : ""}
-      <button class="secondary" @click=${this.onDownloadCapture}>${this.privateSelected ? "Download sealed copy" : "Download this capture"}</button>
-      <button class="secondary" title="It stays in your local library." @click=${this.onSetAsidePending}>Set aside this capture</button>
+      <div class="stack">
+        ${claimable ? html`<button class="primary" @click=${this.onClaimLocalCapture}>Add to my account</button>` : ""}
+        ${canUpload
+          ? html`<button class="primary ${this.privateSelected ? "dark" : ""}" ?disabled=${this.largeBusy} @click=${this.uploadCapture}>${this.privateSelected ? this.lead("lock") : ""}${this.packageButtonLabel}</button>` : ""}
+        ${this.largeState?.checkoutUrl && canUpload ? html`<button class="secondary" @click=${() => this.openTab(this.largeState!.checkoutUrl!)}>${icon("external", 18)}Reopen checkout</button>` : ""}
+        ${!this.walletAddress ? html`<button class="primary" @click=${this.onEmailSignIn}>${this.lead("mail")}Sign in with email</button>${this.renderEmailGrant()}` : ""}
+      </div>
+    </section>
+    <div class="more">
+      <button @click=${this.onDownloadCapture}>${icon("download", 16)}<span class="label">${this.privateSelected ? "Download sealed copy" : "Download this capture"}</span>${icon("chevron", 14, "small chev")}</button>
+      <button title="It stays in your local library." @click=${this.onSetAsidePending}>${icon("record", 16)}<span class="label">Set aside this capture</span>${icon("chevron", 14, "small chev")}</button>
     </div>`;
   }
 
   renderEmailGrant() {
-    return this.emailGrant ? html`<p class="helper">Enter this code on the website: <strong>${this.emailGrant.userCode}</strong>. Only approve a request you started here.</p>
-      <button class="secondary" ?disabled=${this.signingIn} @click=${this.onCheckEmailSignIn}>I've approved it</button>` : "";
+    return this.emailGrant ? html`<p class="code-box">Enter this code on the website: <strong>${this.emailGrant.userCode}</strong>. Only approve a request you started here.</p>
+      <button class="secondary" ?disabled=${this.signingIn} @click=${this.onCheckEmailSignIn}>${icon("check", 18)}I've approved it</button>` : "";
   }
 
   renderSignedOut() {
     return html`
-      <p class="tagline">
-        Save any page, with proof anyone can check.
-      </p>
-      <button class="primary" ?disabled=${this.signingIn} @click=${this.onEmailSignIn}>Sign in with email</button>
-      <p class="helper">How sign-in works ${this.info("Sign in on the website, then enter the code shown here to approve this extension.")}</p>
-      ${this.renderEmailGrant()}
-      <button class="secondary" ?disabled=${!this.canRecord} @click=${this.onArchiveClick}>Save to this browser only</button>
-      <details><summary>Sign in with a key file</summary>
+      <section class="card">
+        <p class="tagline">
+          Save any page, with proof anyone can check.
+        </p>
+        <button class="primary" ?disabled=${this.signingIn} @click=${this.onEmailSignIn}>${this.lead("mail")}Sign in with email</button>
+        <p class="helper">How sign-in works ${this.info("Sign in on the website, then enter the code shown here to approve this extension.")}</p>
+        ${this.renderEmailGrant()}
+      </section>
+      <button class="secondary" ?disabled=${!this.canRecord} @click=${this.onArchiveClick}>${icon("download", 18)}Save to this browser only</button>
+      <details><summary><span class="start">${icon("key", 15)}Sign in with a key file</span>${icon("chevron", 14, "small chev")}</summary>
+      <div class="details-body">
       <label class="file-button">
         <input
           type="file"
           accept=".json,application/json"
           @change=${this.onKeyFile}
         />
-        ${this.signingIn ? "Signing in..." : "Choose key file"}
+        ${icon("upload", 15)}${this.signingIn ? "Signing in..." : "Choose key file"}
       </label>
       ${this.keyFileName
         ? html`<div class="file-name">${this.keyFileName}</div>`
         : ""}
       <div class="or">or paste its contents</div>
       <textarea
-        rows="4"
+        rows="3"
         placeholder="Paste the contents of your key file"
+        aria-label="Paste the contents of your key file"
         .value=${this.pastedKey}
         @input=${this.onPasteKey}
       ></textarea>
@@ -1868,46 +2432,54 @@ class PermavaultPopup extends LitElement {
       </button>
       <p class="helper">
         How key-file sign-in works ${this.info("Your key file is sent securely. Permavault keeps an encrypted copy while you are signed in, and this browser saves it to renew your sign-in.")}
-      </p></details>
+      </p></div></details>
       ${this.keyError
         ? html`<p class="error-text">${this.keyError}</p>`
         : ""}
     `;
   }
 
+  /** The page being saved: its title and address. */
+  renderPageCard(extra: unknown = "") {
+    return html`
+      <section class="card ${extra ? "" : "tight"}">
+        <div class="page-card">
+          <span class="tile" aria-hidden="true">${icon("globe", 17)}</span>
+          <div class="page-text">
+            <div class="page-title" title="${this.pageTitle}">
+              ${this.pageTitle || "Current page"}
+            </div>
+            <div class="page-url" title="${this.pageUrl}">
+              ${this.pageUrl}
+            </div>
+          </div>
+        </div>
+        ${extra}
+      </section>
+    `;
+  }
+
   renderIdle() {
     return html`
-      <div class="page-card">
-        <div
-          class="page-title"
-          title="${this.pageTitle}"
-        >
-          ${this.pageTitle || "Current page"}
-        </div>
-        <div
-          class="page-url"
-          title="${this.pageUrl}"
-        >
-          ${this.pageUrl}
-        </div>
-      </div>
-      ${this.balanceLine
-        ? html`<div class="balance">${this.balanceLine}</div>`
-        : ""}
-      <label class="private-choice">
-        <input type="checkbox" .checked=${this.privateSelected}
+      ${this.renderPageCard(this.balanceLine
+        ? html`<div class="balance-row"><span class="balance">${this.balanceLine}</span></div>`
+        : "")}
+      <label class="private-choice ${this.privateSelected ? "on" : ""}">
+        <input type="checkbox" role="switch" .checked=${this.privateSelected}
           @change=${(event: Event) => { this.privateSelected = (event.target as HTMLInputElement).checked; this.errorMsg = ""; }} />
-        <span><strong>Private</strong><small>Sealed before upload. Only your vault can open it.</small></span>
+        <span class="tile" aria-hidden="true">${icon("lock", 16)}</span>
+        <span class="private-text"><strong>Private</strong><small>Sealed before upload. Only your vault can open it.</small></span>
+        <span class="switch" aria-hidden="true"></span>
       </label>
       <p class="note"><button class="link" @click=${() => this.openTab(`${VAULT_HOME}/private`)}>How Private works</button></p>
       ${this.privateSelected && !this.privateVaultReady ? html`<p class="note">${this.privateVaultMessage || "Checking your Private Vault…"} ${this.privateVaultMessage === VAULT_SETUP_MESSAGE ? html`<button class="link" @click=${() => this.openTab(`${VAULT_HOME}/settings`)}>Set up Private Vault</button>` : ""}</p>` : ""}
       ${this.errorMsg ? html`<p class="error-text">${this.errorMsg}</p>` : ""}
       <button
-        class="primary big"
+        class="primary ${this.privateSelected ? "dark" : ""}"
         ?disabled=${!this.canRecord}
         @click=${this.onArchiveClick}
       >
-        ${this.privateSelected ? "Save privately" : "Save this page"}
+        ${this.lead(this.privateSelected ? "lock" : "record")}${this.privateSelected ? "Save privately" : "Save this page"}
       </button>
       ${!this.canRecord
         ? html`<p class="note">This kind of page can't be saved.</p>`
@@ -1920,100 +2492,113 @@ class PermavaultPopup extends LitElement {
 
   renderCapturing() {
     return html`
-      <div class="status-block">
-        <div class="spinner"></div>
-        <div class="status-text">${this.captureStatusLine}</div>
-        ${this.numPending > 0
-          ? html`<div class="sub-status">
-              ${this.numPending} ${this.numPending === 1 ? "item" : "items"} left
-            </div>`
-          : ""}
-      </div>
-      <button
-        class="secondary"
-        ?disabled=${this.stopping || this.stopRequested}
-        @click=${this.onStopClick}
-      >
-        Finish now
-      </button>
+      ${this.pageUrl ? this.renderPageCard() : ""}
+      <section class="card">
+        <div class="status-block" role="status">
+          <span class="ring"><span class="spinner"></span></span>
+          <div class="status-text">${this.captureStatusLine}</div>
+          ${this.numPending > 0
+            ? html`<div class="sub-status">
+                ${this.numPending} ${this.numPending === 1 ? "item" : "items"} left
+              </div>`
+            : ""}
+        </div>
+        <button
+          class="secondary"
+          ?disabled=${this.stopping || this.stopRequested}
+          @click=${this.onStopClick}
+        >
+          ${icon("check", 18)}Finish now
+        </button>
+      </section>
     `;
   }
 
   renderUploading() {
     return html`
-      <div class="status-block">
-        ${this.uploadPercent === null
-          ? html`<div class="spinner"></div>`
-          : ""}
-        <div class="status-text">
-          ${this.uploadStage === "processing"
-            ? "Finishing on Permavault…"
-            : "Sending to Permavault…"}
+      <section class="card">
+        <div class="status-block" role="status">
+          ${this.uploadPercent === null
+            ? html`<span class="ring"><span class="spinner"></span></span>`
+            : this.heroTile("upload")}
+          <div class="status-text">
+            ${this.uploadStage === "processing"
+              ? "Finishing on Permavault…"
+              : "Sending to Permavault…"}
+          </div>
         </div>
         ${this.uploadPercent !== null
           ? html`
-              <div class="progress">
+              <div class="progress" role="progressbar" aria-valuenow="${this.uploadPercent}" aria-valuemin="0" aria-valuemax="100">
                 <div
                   class="progress-fill"
                   style="width: ${this.uploadPercent}%"
                 ></div>
               </div>
-              <div class="sub-status">${this.uploadPercent}%</div>
+              <div class="sub-status note">${this.uploadPercent}%</div>
             `
           : ""}
-        ${this.largeState?.orderId || this.largeState?.paidEarlier ? html`<div class="sub-status">Paid. Keep this popup open until it finishes.</div>` : ""}
-      </div>
+        ${this.largeState?.orderId || this.largeState?.paidEarlier ? html`<p class="line kept">${icon("check", 14)}Paid. Keep this popup open until it finishes.</p>` : ""}
+      </section>
     `;
   }
 
   renderDone() {
+    const another = html`<button class="tint medium" @click=${this.onArchiveAnother}>${icon("record", 16)}Save another page</button>`;
     if (this.doneKind === "staged") {
       const expiry = serverExpiryDate(this.stagedExpiresAt);
+      const tip = this.info(this.privateSelected
+        ? "Make it permanent before then, or it is deleted. It stays sealed; only your vault can open it."
+        : "Make it permanent before then, or it is deleted. Once permanent, anyone with its link can view it.");
       return html`
-        <div class="panel">
-          <div class="panel-title">${this.privateSelected ? "Saved privately for 7 days" : "Saved free for 7 days"}</div>
-          <p class="panel-sub">
-            ${expiry ? temporaryLine(expiry) : "Check History for when this save expires."}
-            ${this.info(this.privateSelected
-              ? "Make it permanent before then, or it is deleted. It stays sealed; only your vault can open it."
-              : "Make it permanent before then, or it is deleted. Once permanent, anyone with its link can view it.")}
-          </p>
-          ${this.uploadId ? html`<button class="primary" title="${this.privateSelected ? "Opens Permavault to confirm and pay." : ""}" ?disabled=${this.checkoutBusy} @click=${this.onMakePermanent}>${this.privateSelected ? html`Make permanent for $1.99 <span aria-hidden="true">↗</span>` : "Make permanent for $0.99"}</button>` : ""}
-          ${this.errorMsg ? html`<p class="error-text">${this.errorMsg}</p>` : ""}
-          <button class="secondary" @click=${this.onOpenHistory}>View in History</button>
-          <button class="secondary" @click=${this.onArchiveAnother}>Save another page</button>
-        </div>
+        <section class="card">
+          <div class="hero ${this.privateSelected ? "band" : ""}">
+            ${this.heroTile(this.privateSelected ? "lock" : "clock", this.privateSelected ? "glass" : "temp")}
+            <div class="panel-title">${this.privateSelected ? "Saved privately for 7 days" : "Saved free for 7 days"}</div>
+            <p class="panel-sub">
+              <span>${expiry ? temporaryLine(expiry) : "Check History for when this save expires."}</span>
+              ${tip}
+            </p>
+          </div>
+          <div class="stack">
+            ${this.uploadId ? html`<button class="primary ${this.privateSelected ? "dark" : ""}" title="${this.privateSelected ? "Opens Permavault to confirm and pay." : ""}" ?disabled=${this.checkoutBusy} @click=${this.onMakePermanent}>${this.privateSelected ? html`${this.lead("external")}Make permanent for $1.99` : "Make permanent for $0.99"}</button>` : ""}
+            ${this.errorMsg ? html`<p class="error-text">${this.errorMsg}</p>` : ""}
+            <button class="secondary" @click=${this.onOpenHistory}>View in History</button>
+          </div>
+        </section>
+        ${another}
       `;
     }
     if (this.doneKind === "vault" || this.doneKind === "existing") {
       return html`
-        <div class="panel">
-          <div class="done-mark">&#10003;</div>
-          <div class="panel-title">${this.doneKind === "existing" ? "Already saved permanently" : "Sent to permanent storage"}
-            ${this.info(this.privateSelected
-              ? "It stays sealed. Open it from History with your Private Vault."
-              : "Its link can take a few minutes to work. History shows storage and proof status.")}</div>
-          <button class="primary" @click=${this.onViewInVault}>
-            Open in Permavault
+        <section class="card">
+          <div class="hero">
+            ${this.heroTile("check", "ok")}
+            <div class="panel-title">${this.doneKind === "existing" ? "Already saved permanently" : "Sent to permanent storage"}
+              ${this.info(this.privateSelected
+                ? "It stays sealed. Open it from History with your Private Vault."
+                : "Its link can take a few minutes to work. History shows storage and proof status.")}</div>
+          </div>
+          <button class="primary ${this.privateSelected ? "dark" : ""}" @click=${this.onViewInVault}>
+            ${this.privateSelected ? this.lead("lock") : ""}Open in Permavault
           </button>
-          <button class="secondary" @click=${this.onArchiveAnother}>
-            Save another page
-          </button>
-        </div>
+        </section>
+        ${another}
       `;
     }
 
     return html`
-      <div class="panel">
-        <div class="panel-title">Check History for the result</div>
-        <p class="panel-sub">
-          We could not confirm it here. ${this.info("History shows whether it finished, any 7-day deadline, and its proof.")}
-        </p>
+      <section class="card">
+        <div class="hero">
+          ${this.heroTile("hourglass")}
+          <div class="panel-title">Check History for the result</div>
+          <p class="panel-sub">
+            <span>We could not confirm it here.</span> ${this.info("History shows whether it finished, any 7-day deadline, and its proof.")}
+          </p>
+        </div>
         <button class="primary" @click=${this.onOpenHistory}>View in History</button>
-        <button class="secondary" @click=${this.onArchiveAnother}>
-          Save another page
-        </button>
-      </div>
+      </section>
+      ${another}
     `;
   }
 }

@@ -1,6 +1,6 @@
 {
-  "name": "Permavault",
-  "description": "Capture pages before they change. Keep the page and its proof.",
+  "name": "Permavault Archive: Save Web Pages",
+  "description": "Save web pages before they change. Pay once to keep the page and its capture record on permanent storage.",
   "version": "$VERSION",
   "permissions": [
     "debugger",
@@ -18,12 +18,15 @@
     "service_worker": "bg.js"
   },
   "icons": {
-    "32": "$ICON",
+    "16": "$ICON16",
+    "32": "$ICON32",
+    "48": "$ICON48",
     "128": "$ICON"
   },
   "action": {
     "default_icon": {
-      "32": "$ICON"
+      "16": "$ICON16",
+      "32": "$ICON32"
     },
     "default_title": "Permavault",
     "default_popup": "popup.html"
