@@ -201,7 +201,9 @@ function sharedBuild(
 
 // ===========================================================================
 const extensionWebConfig = (env, argv) => {
-  const icon = argv.mode === "production" ? "icon.png" : "icon-dev.png";
+  const production = argv.mode === "production";
+  const icon = production ? "icon.png" : "icon-dev.png";
+  const sizedIcon = (size) => (production ? `icon-${size}.png` : "icon-dev.png");
 
   const generateManifest = (name, value) => {
     switch (value) {
@@ -210,6 +212,15 @@ const extensionWebConfig = (env, argv) => {
 
       case "$ICON":
         return icon;
+
+      case "$ICON16":
+        return sizedIcon(16);
+
+      case "$ICON32":
+        return sizedIcon(32);
+
+      case "$ICON48":
+        return sizedIcon(48);
     }
 
     return value;

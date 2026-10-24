@@ -46,7 +46,7 @@ function popup(confirm = () => true, result = { status: 202, json: { jobId: "job
     setTimeout: (callback, delay) => { timers.set(delay, callback); return delay; },
     clearTimeout: delay => { timers.delete(delay); },
     require(name) {
-      if (name === 'lit') return { LitElement: class {}, html: template, css: template };
+      if (name === 'lit') return { LitElement: class {}, html: template, css: template, svg: template };
       if (name === './pv/extensionAuth') return { loadEmailGrant: async () => null };
       if (name === './pv/largeCapture') return large;
       if (name === './pv/api') return {
@@ -313,7 +313,8 @@ test('a private save is made permanent on its page in Permavault (PV-470)', asyn
   const h = popup();
   h.instance.privateSelected = true;
   h.instance.completeCapture({ uploadId: 'private-save', staged: true, stagedExpiresAt: '2026-10-01T12:00:00Z', txId: null });
-  assert.match(h.instance.renderDone(), /Make permanent for \$1.99 <span aria-hidden="true">↗/);
+  // The button carries the "opens elsewhere" icon, since checkout happens on Permavault.
+  assert.match(h.instance.renderDone(), /<span class="lead"><svg[^>]*><path d="M15 3h6v6"><\/path>[\s\S]*?<\/span>Make permanent for \$1\.99/);
   assert.match(h.instance.renderDone(), /Opens Permavault to confirm and pay/);
   let url;
   h.instance.openTab = value => { url = value; };
@@ -513,7 +514,7 @@ test('cross-account restored package is download-only and preserves its original
   await h.instance.initSession();
   assert.equal(h.instance.pendingAccountMismatch, true);
   assert.match(h.instance.renderMain(), /Saved under another account/);
-  assert.match(h.instance.renderMain(), /Page: https:\/\/example.com\/account-a/);
+  assert.match(h.instance.renderMain(), /Page:<\/span><span class="fact-value"[^>]*>https:\/\/example.com\/account-a/);
   assert.doesNotMatch(h.instance.renderMain(), />Save this page</);
   await h.instance.uploadCapture();
   assert.equal(h.uploads(), 0);
