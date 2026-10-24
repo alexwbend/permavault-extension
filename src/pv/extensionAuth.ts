@@ -26,12 +26,12 @@ export async function startEmailGrant(): Promise<EmailGrant> {
   const response = await fetch(`${await getApiBase()}/auth/extension/start`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ challenge }),
   });
-  if (!response.ok) throw new Error("Sign-in could not start. Please try again.");
+  if (!response.ok) throw new Error("Couldn't start sign-in. Try again.");
   const data = await response.json();
   const url = new URL(data.approvalUrl);
   if (url.origin !== await getAppOrigin() || url.pathname !== "/extension/approve" ||
       !/^[A-Z0-9]{8}$/.test(data.userCode) || !data.id || !(Date.parse(data.expiresAt) > Date.now())) {
-    throw new Error("The sign-in response could not be verified.");
+    throw new Error("We couldn't verify this sign-in. Start again.");
   }
   await assertAuthGeneration(generation);
   const grant = { ...data, verifier, generation } as EmailGrant;
@@ -40,7 +40,7 @@ export async function startEmailGrant(): Promise<EmailGrant> {
 }
 export async function exchangeEmailGrant(): Promise<boolean> {
   const grant = await loadEmailGrant();
-  if (!grant) throw new Error("The sign-in request expired. Start again.");
+  if (!grant) throw new Error("This sign-in request has ended. Start again.");
   await assertAuthGeneration(grant.generation);
   const response = await fetch(`${await getApiBase()}/auth/extension/exchange`, {
     method: "POST", headers: { "Content-Type": "application/json" },
@@ -49,13 +49,13 @@ export async function exchangeEmailGrant(): Promise<boolean> {
   if (response.status === 202) return false;
   if (response.status === 410) {
     await removeLocalOption(KEY);
-    throw new Error("This sign-in request expired or was already used. Start again.");
+    throw new Error("This sign-in request has ended. Start again.");
   }
-  if (!response.ok) throw new Error("Sign-in could not be checked. Please try again.");
+  if (!response.ok) throw new Error("Couldn't check sign-in. Try again.");
   const data = await response.json();
-  if (!data.token || !data.user?.walletAddress) throw new Error("The sign-in response is incomplete.");
+  if (!data.token || !data.user?.walletAddress) throw new Error("We couldn't verify this sign-in. Start again.");
   const active = await loadEmailGrant();
-  if (active?.id !== grant.id || active.verifier !== grant.verifier) throw new Error("This sign-in request was cancelled. Start again.");
+  if (active?.id !== grant.id || active.verifier !== grant.verifier) throw new Error("This sign-in request has ended. Start again.");
   await acceptEmailSession(data.token, data.user.walletAddress, grant.generation);
   await removeLocalOption(KEY);
   return true;

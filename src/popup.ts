@@ -25,7 +25,7 @@ import { loadPending, savePending, clearPending, type LargeCaptureState } from "
 
 import { startEmailGrant, loadEmailGrant, exchangeEmailGrant, type EmailGrant } from "./pv/extensionAuth";
 import { quoteLargeCapture, checkoutLargeCapture, coveringLargePayment, largeCheckoutState, uploadLargeCapture, ServerRefusal, PAYMENT_GONE } from "./pv/largeCapture";
-import { ARTICLE_BYTES, getPrivateVault, lockArticle, stagePrivateArticle, type LockedArticle } from "./pv/privateArticle";
+import { ARTICLE_BYTES, VAULT_SETUP_MESSAGE, getPrivateVault, lockArticle, stagePrivateArticle, type LockedArticle } from "./pv/privateArticle";
 import { getLocalOption, setLocalOption, removeLocalOption } from "./localstorage";
 
 const STANDARD_BYTES = 100 * 1024 * 1024;
@@ -40,27 +40,25 @@ const WACZ_API_PREFIX = "./w/api";
 const WS_FALLBACK_TIMEOUT = 120000;
 const JOB_POLL_INTERVAL = 5000;
 
-const LOCAL_CAPTURE_NOTICE = `Record a local package?
+const LOCAL_CAPTURE_NOTICE = `Save to this browser only?
 
-This records your current browser session and may include logged-in or personal content. The captured archive stays in this browser's local library. It is not uploaded to Permavault or published by this action.
+It stays in this browser. Nothing is uploaded.
+Sign in later to make it permanent.`;
 
-You can inspect and download the package. To upload from this extension later, sign in and explicitly choose to use the package with that account, then review the upload destination.`;
+const CAPTURE_DESTINATION_NOTICE = `Save this page?
 
-const CAPTURE_DESTINATION_NOTICE = `Record and upload this page?
+Saves the page exactly as you see it, including anything you're signed in to see.
+Up to 10 MB: free for 7 days, then $0.99 to make permanent.
+Once permanent, anyone with its link can view it.
 
-This records your current browser session and may include logged-in or personal content. The archive is sent to Permavault with readable contents. It is not locked as a Private Capture.
+Only save pages you have the right to share.`;
 
-Eligible article saves up to 10 MB are held for 7 days, then deleted unless you pay to make them permanent. Larger paid uploads go to public permanent storage. Once made permanent, anyone with the archive link can read the captured content and it cannot be deleted from Arweave.
+const PRIVATE_CAPTURE_NOTICE = `Save this page privately?
 
-Only continue with content you are willing and entitled to publish. You can inspect captures in the extension's local library; this action records and uploads automatically.`;
+Sealed on this device before upload. Only your vault can open it.
+Up to 10 MB: free for 7 days, then $1.99 to make permanent.
 
-const PRIVATE_CAPTURE_NOTICE = `Record this page privately?
-
-This records your current browser session and may include logged-in or personal content. The WACZ package is locked in this extension before it is sent to Permavault. Your local library still keeps a readable copy on this device.
-
-Private article saves up to 10 MB are held for 7 days, then deleted unless you pay $1.99 to make them permanent. The permanent copy stays locked, but its existence, size, date and the fact your account made a capture are visible. Keep your Recovery Kit: without a working device or the kit, you cannot open it.
-
-The extension records and sends automatically after you continue. Review the local package if you need to check what the page included.`;
+A readable copy also stays in this browser's local library.`;
 
 // Backend expiry timestamps use SQLite UTC or ISO 8601 with a timezone.
 export function serverExpiryDate(value: string): Date | null {
@@ -69,6 +67,19 @@ export function serverExpiryDate(value: string): Date | null {
   const normalized = canonical ? value.replace(" ", "T") + "Z" : hasZone ? value : "";
   const date = new Date(normalized);
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/**
+ * The web app's wording for a temporary save (captureStatus/formatDeadline):
+ * the time left first, then the moment in the reader's own time.
+ */
+export function temporaryLine(expiry: Date, now = Date.now()): string {
+  const ms = expiry.getTime() - now;
+  if (ms <= 0) return "Temporary · ending now";
+  const hours = Math.floor(ms / 3600000);
+  const left = hours < 1 ? "under an hour" : hours <= 48 ? `${hours} hour${hours === 1 ? "" : "s"}` : `${Math.floor(hours / 24)} days`;
+  const moment = expiry.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" });
+  return `Temporary · ${left} left, until ${moment}`;
 }
 
 // ===========================================================================
@@ -90,6 +101,7 @@ class PermavaultPopup extends LitElement {
   declare startingCapture: boolean;
   declare pendingAccount: string | null;
   declare walletAddress: string;
+  declare accountEmail: string;
   declare balance: number;
   declare balanceUnlimited: boolean;
   declare balanceLoaded: boolean;
@@ -149,6 +161,7 @@ class PermavaultPopup extends LitElement {
     this.pendingAccount = null;
 
     this.walletAddress = "";
+    this.accountEmail = "";
     this.balance = 0;
     this.balanceUnlimited = false;
     this.balanceLoaded = false;
@@ -205,6 +218,7 @@ class PermavaultPopup extends LitElement {
       phase: { type: String },
 
       walletAddress: { type: String },
+      accountEmail: { type: String },
       balance: { type: Number },
       balanceUnlimited: { type: Boolean },
       balanceLoaded: { type: Boolean },
@@ -253,11 +267,13 @@ class PermavaultPopup extends LitElement {
     const session = await getStoredSession();
     if (session) {
       this.walletAddress = session.walletAddress;
+      this.accountEmail = session.email || "";
       this.phase = "idle";
       void this.refreshBalance();
       void this.refreshPrivateVault();
     } else {
       this.walletAddress = "";
+      this.accountEmail = "";
       this.phase = "signed-out";
     }
     try {
@@ -285,7 +301,7 @@ class PermavaultPopup extends LitElement {
         }
       }
     } catch (_e) {
-      this.errorMsg = "The saved package could not be reopened. Use the local library to download your capture.";
+      this.errorMsg = "We couldn't reopen your last capture. Open your local library to download it.";
     }
     // The background recorder may answer before account and pending-package
     // storage finish loading. Keep its live state when that happens.
@@ -303,7 +319,7 @@ class PermavaultPopup extends LitElement {
       this.privateVaultMessage = "";
     } catch (error) {
       this.privateVaultReady = false;
-      this.privateVaultMessage = error instanceof Error ? error.message : "Your Private Vault is unavailable.";
+      this.privateVaultMessage = error instanceof Error ? error.message : "Can't reach your Private Vault right now. Try again soon.";
     }
   }
 
@@ -313,7 +329,7 @@ class PermavaultPopup extends LitElement {
     try {
       this.emailGrant = await startEmailGrant();
       this.openTab(this.emailGrant.approvalUrl);
-    } catch (error) { this.keyError = error instanceof Error ? error.message : "Sign-in could not start."; }
+    } catch (error) { this.keyError = error instanceof Error ? error.message : "Couldn't start sign-in. Try again."; }
     finally { this.signingIn = false; }
   }
 
@@ -323,13 +339,13 @@ class PermavaultPopup extends LitElement {
     this.keyError = "";
     try {
       this.emailGrant = await loadEmailGrant();
-      if (!this.emailGrant) throw new Error("Start a new sign-in request.");
+      if (!this.emailGrant) throw new Error("This sign-in request has ended. Start again.");
       if (await exchangeEmailGrant()) {
         this.emailGrant = null;
         this.destinationAccepted = false;
         await this.initSession();
-      } else this.keyError = "Waiting for approval. Enter the code above on the website, then check again.";
-    } catch (error) { this.keyError = error instanceof Error ? error.message : "Sign-in could not be checked."; }
+      } else this.keyError = "Waiting for approval on the website.";
+    } catch (error) { this.keyError = error instanceof Error ? error.message : "Couldn't check sign-in. Try again."; }
     finally { this.signingIn = false; }
   }
 
@@ -354,8 +370,7 @@ class PermavaultPopup extends LitElement {
     try {
       jwk = JSON.parse(text);
     } catch (_e) {
-      this.keyError =
-        "That does not look like a key file. It should be the JSON key file you use for Arweave.";
+      this.keyError = "That isn't a key file. Choose the .json file you sign in with.";
       return;
     }
 
@@ -368,8 +383,7 @@ class PermavaultPopup extends LitElement {
       await this.initSession();
       void this.refreshBalance();
     } catch (_e) {
-      this.keyError =
-        "Sign in did not work. Check your connection, and make sure this is the same key you use at app.permavault.xyz.";
+      this.keyError = "Sign-in didn't work. Check your connection and use the key you sign in with on the website.";
     } finally {
       this.signingIn = false;
     }
@@ -379,6 +393,7 @@ class PermavaultPopup extends LitElement {
     this.closeJobChannel();
     await signOut();
     this.walletAddress = "";
+    this.accountEmail = "";
     this.balanceLoaded = false;
     this.privateVaultReady = false;
     // Keep an unfinished package visible so a local-only capture cannot
@@ -400,7 +415,7 @@ class PermavaultPopup extends LitElement {
       if (this.port !== port) return;
       this.port = null;
       if (this.phase === "capturing" && this.waitingForStart && !this.wasRecording) {
-        this.captureStartUnconfirmed("The recorder connection closed before the capture started. Check the local library before trying again.");
+        this.captureStartUnconfirmed("The capture didn't start. Check your local library before trying again.");
       }
     });
 
@@ -453,7 +468,7 @@ class PermavaultPopup extends LitElement {
 
       case "startRecordingFailed":
         if (this.phase === "capturing" && !this.wasRecording) {
-          this.captureStartUnconfirmed("This capture could not start. Check the local library before trying again.");
+          this.captureStartUnconfirmed("The capture didn't start. Check your local library before trying again.");
         }
         break;
     }
@@ -500,8 +515,7 @@ class PermavaultPopup extends LitElement {
 
     if (message.failureMsg) {
       this.phase = "error";
-      this.errorMsg =
-        "This page could not be archived. Try again, or try a different page.";
+      this.errorMsg = "This page couldn't be saved. Try again, or try another page.";
       return;
     }
 
@@ -551,7 +565,7 @@ class PermavaultPopup extends LitElement {
       pending = await loadPending();
     } catch {
       this.phase = "error";
-      this.errorMsg = "The pending package could not be checked. Open the local library before trying again.";
+      this.errorMsg = "We couldn't reopen your last capture. Open your local library to download it.";
       this.startingCapture = false;
       return;
     }
@@ -562,7 +576,7 @@ class PermavaultPopup extends LitElement {
         this.sourceUrl = pending.sourceUrl;
         this.pendingAccount = pending.account;
       }
-      this.errorMsg = "Finish or set aside the pending package before recording another page. It remains in your local library.";
+      this.errorMsg = "Finish or set aside your last capture first. It's safe in your local library.";
       this.phase = "review-capture";
       this.startingCapture = false;
       return;
@@ -577,7 +591,7 @@ class PermavaultPopup extends LitElement {
       if (privateRequested) await getPrivateVault(this.walletAddress);
       await setLocalOption("pvPendingPrivacy", privateRequested ? "private" : "public");
     } catch (error) {
-      this.errorMsg = error instanceof Error ? error.message : "This capture could not start. Nothing was sent.";
+      this.errorMsg = error instanceof Error ? error.message : "This capture couldn't start. Nothing was sent.";
       this.startingCapture = false;
       return;
     }
@@ -601,7 +615,7 @@ class PermavaultPopup extends LitElement {
         autorun: true,
       });
     } catch {
-      this.captureStartUnconfirmed("This capture could not start. Check the local library before trying again.");
+      this.captureStartUnconfirmed("The capture didn't start. Check your local library before trying again.");
     } finally {
       this.startingCapture = false;
     }
@@ -662,7 +676,7 @@ class PermavaultPopup extends LitElement {
       this.sourceUrl = this.capturedPageUrl || this.pageUrl;
       if (this.privateSelected) {
         if (!this.walletAddress) throw new Error("Sign in to save this page privately.");
-        if (this.pendingAccount !== this.walletAddress) throw new Error("The signed-in account changed. Nothing was sent. Your capture is in the local library.");
+        if (this.pendingAccount !== this.walletAddress) throw new Error("You switched accounts, so nothing was sent. Sign in to the account that saved it.");
         const vault = await getPrivateVault(this.walletAddress);
         this.privateArticle = await lockArticle(this.waczBlob, vault);
         this.waczBlob = this.privateArticle.blob;
@@ -674,7 +688,7 @@ class PermavaultPopup extends LitElement {
       if (!this.privateSelected) console.warn(e);
       this.phase = "error";
       this.errorMsg = this.privateSelected && e instanceof Error ? e.message
-        : "The capture finished, but the package could not be built. Your capture is safe in the local library.";
+        : "The page was recorded but couldn't be prepared. It's safe in your local library.";
       return;
     }
 
@@ -682,7 +696,7 @@ class PermavaultPopup extends LitElement {
       await this.persistPending();
     } catch (_e) {
       this.phase = "error";
-      this.errorMsg = "The package could not be retained for payment. Download your capture from the local library before continuing.";
+      this.errorMsg = "We couldn't keep this capture for payment. Download it from your local library first.";
       return;
     }
     if (!this.walletAddress || (!this.privateSelected && (this.waczBlob?.size ?? 0) > ARTICLE_BYTES)) {
@@ -735,7 +749,7 @@ class PermavaultPopup extends LitElement {
         // PV-536: this package's own unused payment is used, after asking.
         const covering = await coveringLargePayment(this.waczBlob.size, this.walletAddress);
         if (covering) {
-          if (!window.confirm("An earlier payment covers this package, so there is nothing more to pay. Press OK to use it and upload now.")) return;
+          if (!window.confirm("Already paid for. An earlier payment covers this capture. Upload it now?")) return;
           Object.assign(state, { orderId: covering, paidEarlier: true });
           this.largeQuote = null;
           await this.persistPending();
@@ -746,15 +760,11 @@ class PermavaultPopup extends LitElement {
         this.largeQuote = quote.amountCents;
         if (!quote.included) {
           if (!state.orderId) {
-            // PV-475: the server's line, and pressing OK is the request to
-            // pay and preserve now. The final total shows again in Stripe.
-            const ack = "withdrawalAck" in quote ? quote.withdrawalAck : undefined;
+            // PV-575 row 3: nothing is shown above the payment; the no-refund
+            // rule lives in Terms section 6.
             const price = `$${(quote.amountCents / 100).toFixed(2)}`;
-            const ask = ack
-              ? `This measured package costs ${price}.\n\n${ack.text}\n\nPress OK to pay and preserve now. The final total is shown before you pay.`
-              : `This measured package costs ${price}. Continue to checkout? The final total is shown before you pay.`;
-            if (!window.confirm(ask)) return;
-            const checkout = await checkoutLargeCapture(this.waczBlob.size, state, ack?.version);
+            if (!window.confirm(`Make this capture permanent for ${price}?\n\nPriced by size, paid once. No subscription. Checkout opens in a new tab.`)) return;
+            const checkout = await checkoutLargeCapture(this.waczBlob.size, state);
             // A checkout of our own never carries an earlier payment's flag.
             Object.assign(state, { paidEarlier: undefined }, checkout);
             if ("paidEarlier" in checkout) this.largeQuote = null;
@@ -771,11 +781,11 @@ class PermavaultPopup extends LitElement {
               // PV-536: that checkout closed unpaid; the next press opens a new one.
               this.releaseLargePayment(state);
               await this.persistPending();
-              this.errorMsg = "That checkout closed without a payment, so nothing was charged. Press Continue with this package to pay.";
+              this.errorMsg = "That checkout closed without payment, so nothing was charged. Press See price to try again.";
               return;
             }
             if (checkout !== "paid") {
-              this.errorMsg = "Payment is not confirmed yet. Finish the existing checkout, then continue this package. No new payment was created.";
+              this.errorMsg = "Waiting for your payment. Finish checkout, then press Upload now.";
               return;
             }
           }
@@ -794,16 +804,16 @@ class PermavaultPopup extends LitElement {
         // go, so the next press looks again instead of repeating the refusal.
         this.releaseLargePayment(this.largeState);
         await this.persistPending();
-        this.errorMsg = "The payment this package was going to use is no longer free. Nothing more was charged. Press Continue with this package to check again.";
+        this.errorMsg = "That earlier payment is already in use. Nothing more was charged. Press See price to check again.";
       } else {
-        this.errorMsg = error instanceof Error ? error.message : "Upload paused. Your exact package is retained.";
+        this.errorMsg = error instanceof Error ? error.message : "Upload paused. Your capture is kept in this browser. Press Upload now to resume.";
       }
     } finally { this.largeBusy = false; }
   }
 
   async onClaimLocalCapture() {
     if (this.pendingAccount !== "" || !this.walletAddress) return;
-    if (!window.confirm("Use this local package with the account signed in to this extension? It will be uploaded with readable contents. Review the price and destination before continuing.")) return;
+    if (!window.confirm("Add this capture to your account? It's saved as a regular capture.")) return;
     this.pendingAccount = this.walletAddress;
     this.destinationAccepted = false;
     await this.persistPending();
@@ -827,7 +837,7 @@ class PermavaultPopup extends LitElement {
     if (!this.destinationAccepted) {
       if (!window.confirm(this.privateSelected ? PRIVATE_CAPTURE_NOTICE : CAPTURE_DESTINATION_NOTICE)) {
         this.phase = "error";
-        this.errorMsg = "Upload cancelled. The capture remains in the local library.";
+        this.errorMsg = "Cancelled. Your capture is in your local library.";
         return;
       }
       this.destinationAccepted = true;
@@ -846,13 +856,12 @@ class PermavaultPopup extends LitElement {
 
     if (!this.waczBlob) {
       this.phase = "error";
-      this.errorMsg =
-        "The packaged capture is no longer in memory. Archive the page again.";
+      this.errorMsg = "This capture is no longer open here. Save the page again.";
       return;
     }
     if (this.privateSelected && !this.privateArticle) {
       this.phase = "error";
-      this.errorMsg = "This page could not be locked. Nothing was sent. It remains in your local library.";
+      this.errorMsg = "This page couldn't be sealed, so nothing was sent. It's in your local library.";
       return;
     }
 
@@ -906,13 +915,13 @@ class PermavaultPopup extends LitElement {
     switch (status) {
       case 400:
         this.phase = "error";
-        this.errorMsg = "The server did not accept this package. Your capture remains in the local library.";
+        this.errorMsg = "Permavault couldn't accept this capture. It's safe in your local library.";
         break;
 
       case 402:
         if (this.privateSelected) {
           this.phase = "error";
-          this.errorMsg = "This private save was not staged. Check History before trying again.";
+          this.errorMsg = "This private save didn't go through. Check History before trying again.";
         } else {
           this.balance = typeof json?.balance === "number" ? json.balance : 0;
           this.phase = "out-of-captures";
@@ -921,14 +930,12 @@ class PermavaultPopup extends LitElement {
 
       case 409:
         this.phase = "error";
-        this.errorMsg =
-          "Another capture is already being archived. Give it a moment, then try again.";
+        this.errorMsg = "Another capture is still saving. Try again in a moment.";
         break;
 
       default:
         this.phase = "error";
-        this.errorMsg =
-          "The upload did not go through. Your capture is safe in the local library.";
+        this.errorMsg = "The upload didn't go through. Your capture is safe in your local library.";
     }
   }
 
@@ -983,7 +990,7 @@ class PermavaultPopup extends LitElement {
           } else if (job.status === "failed") {
             finish(() => {
               this.phase = "error";
-              this.errorMsg = "The vault could not finish this capture. Your capture is safe in the local library.";
+              this.errorMsg = "Permavault couldn't finish this capture. It's safe in your local library.";
               this.closeJobChannel();
             });
           }
@@ -1029,7 +1036,7 @@ class PermavaultPopup extends LitElement {
             if (!this.privateSelected) console.warn("upload job failed", data);
             this.phase = "error";
             this.errorMsg =
-              "The vault could not finish this capture. Your capture is safe in the local library.";
+              "Permavault couldn't finish this capture. It's safe in your local library.";
             this.closeJobChannel();
           }),
         onWsError: () => { void checkDurableStatus(); },
@@ -1067,7 +1074,7 @@ class PermavaultPopup extends LitElement {
     this.checkoutBusy = true;
     this.errorMsg = "";
     try { this.openTab(await makePermanent(this.uploadId)); }
-    catch (error) { this.errorMsg = error instanceof Error ? error.message : "Check History to continue payment."; }
+    catch (error) { this.errorMsg = error instanceof Error ? error.message : "Checkout didn't open. Check History to continue."; }
     finally { this.checkoutBusy = false; }
   }
 
@@ -1122,11 +1129,11 @@ class PermavaultPopup extends LitElement {
   }
 
   async onSetAsidePending() {
-    if (!window.confirm("Set aside this pending upload package? The recorded page stays in your local library. If an upload was already submitted, it may still finish; check History on the website.")) return;
+    if (!window.confirm("Set aside this capture? It stays in your local library. If it was already sent, check History.")) return;
     try {
       await clearPending();
     } catch {
-      this.errorMsg = "The pending package could not be set aside. Open the local library before trying again.";
+      this.errorMsg = "We couldn't set aside your last capture. Open your local library to download it.";
       return;
     }
     this.resetForNext(false);
@@ -1249,7 +1256,7 @@ class PermavaultPopup extends LitElement {
       return "";
     }
     if (this.balanceUnlimited) {
-      return "Unlimited captures";
+      return "Captures included";
     }
     return `${this.balance} ${this.balance === 1 ? "capture" : "captures"} left`;
   }
@@ -1260,25 +1267,42 @@ class PermavaultPopup extends LitElement {
 
   get captureStatusLine() {
     if (this.waitingForStart) {
-      return "Starting the capture. The page will reload.";
+      return "Starting… the page will reload.";
     }
     if (this.stopping || this.stopRequested) {
-      return "Finishing the capture.";
+      return "Finishing up…";
     }
     switch (this.behaviorState) {
       case BEHAVIOR_WAIT_LOAD:
-        return "Waiting for the page to load.";
+        return "Loading the page…";
       case BEHAVIOR_DONE:
-        return "Finishing the capture.";
+        return "Finishing up…";
       case BEHAVIOR_RUNNING:
-        return this.behaviorMsg || "Archiving page content.";
+        return this.behaviorMsg || "Saving the page…";
       case BEHAVIOR_READY_START:
-        return "Getting the page ready.";
+        return "Getting the page ready…";
       case BEHAVIOR_PAUSED:
-        return this.behaviorMsg || "Archiving paused.";
+        return this.behaviorMsg || "Paused.";
       default:
-        return this.behaviorMsg || "Archiving page content.";
+        return this.behaviorMsg || "Saving the page…";
     }
+  }
+
+  get accountLabel() {
+    return this.accountEmail || "Signed in";
+  }
+
+  /** The main button on the package screen says what it will do next. */
+  get packageButtonLabel() {
+    const size = this.waczBlob?.size || 0;
+    if (this.privateSelected) return "Save privately";
+    if (size > STANDARD_BYTES) {
+      const paying = this.largeState?.orderId || this.largeState?.paidEarlier;
+      if (this.largeBusy && !paying) return "Getting your price…";
+      return paying || this.balanceUnlimited ? "Upload now" : "See price";
+    }
+    if (size > ARTICLE_BYTES) return this.balanceUnlimited ? "Upload now" : "Use 1 capture and save";
+    return "Save this page";
   }
 
   // -----------------------------------------------------------------------
@@ -1350,9 +1374,30 @@ class PermavaultPopup extends LitElement {
       }
 
       .wallet {
-        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-        font-size: 11px;
+        max-width: 170px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 12px;
         color: var(--pv-muted);
+      }
+
+      .info {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        margin-left: 2px;
+        border-radius: 50%;
+        border: 1px solid var(--pv-muted);
+        color: var(--pv-muted);
+        font-size: 11px;
+        font-weight: 700;
+        font-style: normal;
+        line-height: 1;
+        vertical-align: middle;
+        cursor: help;
       }
 
       main {
@@ -1659,11 +1704,7 @@ class PermavaultPopup extends LitElement {
         ${signedIn
           ? html`
               <div class="account">
-                <span
-                  class="wallet"
-                  title="${this.walletAddress}"
-                  >${this.shortWallet}</span
-                >
+                <span class="wallet" title="${this.accountLabel}">${this.accountLabel}</span>
                 <button class="link signout" @click=${this.onSignOut}>
                   Sign out
                 </button>
@@ -1677,11 +1718,16 @@ class PermavaultPopup extends LitElement {
   renderFooter() {
     return html`
       <footer>
-        <button class="link" @click=${this.onOpenVault}>Open vault</button>
+        <button class="link" @click=${this.onOpenVault}>Open Permavault</button>
         <span>&middot;</span>
         <button class="link" @click=${this.onOpenLibrary}>Local library</button>
       </footer>
     `;
+  }
+
+  /** A short detail behind an (i), so the screen itself stays short. */
+  info(text: string) {
+    return html`<span class="info" role="img" tabindex="0" aria-label="${text}" title="${text}">i</span>`;
   }
 
   renderMain() {
@@ -1693,29 +1739,7 @@ class PermavaultPopup extends LitElement {
         return this.renderIdle();
 
       case "review-capture":
-        return html`<div class="panel">
-          <div class="panel-title">Your capture is ready</div>
-          ${this.sourceUrl && !this.privateSelected ? html`<p class="panel-sub">Captured page: ${this.sourceUrl}</p>` : ""}
-          <p class="panel-sub">Package size: ${((this.waczBlob?.size || 0) / 1024 / 1024).toFixed(2)} MB.
-            ${this.pendingAccountMismatch ? "This package was recorded under a different sign-in. It can only be downloaded here until you sign in to the original account in the extension. No capture will be spent on this account."
-              : !this.walletAddress ? "Download this package, sign in by email on the website, and upload the file there. The website shows the price before payment."
-              : this.privateSelected ? "Send this locked package for 7-day temporary storage. Making it permanent costs $1.99. The readable original remains in your local library."
-              : (this.waczBlob?.size || 0) > STANDARD_BYTES ? "Get a price for this measured package, then pay and upload here. Closing the popup pauses the upload; reopen it to continue the same bytes."
-              : (this.waczBlob?.size || 0) > ARTICLE_BYTES ? "This uses one prepaid capture, or costs $4.99 if you need to buy one. The readable archive goes to public permanent storage."
-              : "Eligible article saves are held free for 7 days. Making a save permanent costs $0.99."}
-            Your package is retained in this browser while you arrange payment.</p>
-          ${this.pendingAccount === "" && this.walletAddress ? html`<button class="secondary" @click=${this.onClaimLocalCapture}>Use local package with this account</button>` : ""}
-          ${this.largeState?.paidEarlier ? html`<p>Covered by an earlier payment. Nothing more to pay.</p>` : ""}
-          ${this.largeQuote !== null && !this.largeState?.paidEarlier ? html`<p>Total: $${(this.largeQuote / 100).toFixed(2)}</p>` : ""}
-          ${this.errorMsg ? html`<p class="error-text">${this.errorMsg}</p>` : ""}
-          ${this.walletAddress && !this.pendingAccountMismatch
-            ? html`<button class="primary" ?disabled=${this.largeBusy} @click=${this.uploadCapture}>${this.largeBusy ? "Preparing package..." : "Continue with this package"}</button>` : ""}
-          ${this.largeState?.checkoutUrl && !this.pendingAccountMismatch ? html`<button class="secondary" @click=${() => this.openTab(this.largeState!.checkoutUrl!)}>Reopen existing checkout</button>` : ""}
-          ${!this.walletAddress ? html`<button class="secondary" @click=${this.onEmailSignIn}>Sign in with email</button>${this.renderEmailGrant()}` : ""}
-          <button class="secondary" @click=${this.onDownloadCapture}>Download ${this.privateSelected ? "locked" : "local"} package</button>
-          <button class="secondary" @click=${this.onSetAsidePending}>Set aside and record another page</button>
-          <button class="secondary" @click=${this.onOpenVault}>Open website</button>
-        </div>`;
+        return this.renderReview();
 
       case "capturing":
         return this.renderCapturing();
@@ -1724,7 +1748,7 @@ class PermavaultPopup extends LitElement {
         return html`
           <div class="status-block">
             <div class="spinner"></div>
-            <div class="status-text">Packaging your capture.</div>
+            <div class="status-text">${this.privateSelected ? "Sealing in your browser…" : "Preparing your capture…"}</div>
           </div>
         `;
 
@@ -1734,32 +1758,11 @@ class PermavaultPopup extends LitElement {
       case "done":
         return this.renderDone();
 
-      case "server-not-ready":
-        return html`
-          <div class="panel">
-            <div class="panel-title">Saved to your local library</div>
-            <p class="panel-sub">
-              The vault upload is not available yet. It ships on the server
-              side soon, and your capture is safe in the local library in the
-              meantime.
-            </p>
-            <button class="primary" @click=${this.onTryAgain}>
-              Try again
-            </button>
-            <button class="secondary" @click=${this.onArchiveAnother}>
-              Archive another page
-            </button>
-          </div>
-        `;
-
       case "out-of-captures":
         return html`
           <div class="panel">
-            <div class="panel-title">You are out of captures</div>
-            <p class="panel-sub">
-              Buy more captures to keep archiving to your vault. This capture
-              is saved in your local library.
-            </p>
+            <div class="panel-title">No captures left</div>
+            <p class="panel-sub">Your page is safe in this browser.</p>
             <button class="primary" @click=${this.onBuyCaptures}>
               Buy captures
             </button>
@@ -1773,10 +1776,9 @@ class PermavaultPopup extends LitElement {
       default:
         return html`
           <div class="panel">
-            <div class="panel-title">Something went wrong</div>
+            <div class="panel-title">We couldn't finish this</div>
             <p class="panel-sub">
-              ${this.errorMsg ||
-              "Something went wrong. Your capture is safe in the local library."}
+              ${this.errorMsg || "Your page is safe in this browser."}
             </p>
             <button class="primary" @click=${this.onTryAgain}>
               Try again
@@ -1787,21 +1789,58 @@ class PermavaultPopup extends LitElement {
     }
   }
 
+  renderReview() {
+    const size = this.waczBlob?.size || 0;
+    const large = !this.privateSelected && size > STANDARD_BYTES;
+    // A capture saved before signing in can be added to the account now
+    // signed in; one saved under another account stays download-only here.
+    const claimable = this.pendingAccount === "" && Boolean(this.walletAddress);
+    const otherAccount = this.pendingAccountMismatch && !claimable && Boolean(this.walletAddress);
+    const canUpload = Boolean(this.walletAddress) && !this.pendingAccountMismatch;
+    let line: unknown = "";
+    if (!this.walletAddress) line = "Sign in to make it permanent, or download it.";
+    else if (claimable) line = "You saved this before signing in. Add it to this account to make it permanent.";
+    else if (otherAccount) line = html`Saved under another account. Sign in to it to upload. ${this.info("Nothing is spent on this account.")}`;
+    else if (this.privateSelected) line = "Sealed and ready. Free for 7 days, then $1.99 to make permanent.";
+    else if (large) line = "";
+    else if (size > ARTICLE_BYTES) line = this.balanceUnlimited ? "Saved permanently. Anyone with its link can view it."
+      : html`Over 10 MB, so this uses 1 prepaid capture ($4.99 each). ${this.info("Saved permanently. Anyone with its link can view it.")}`;
+    else line = "Free for 7 days, then $0.99 to make permanent.";
+    const keepsUntilPaid = canUpload && large && !this.balanceUnlimited && !this.largeState?.orderId && !this.largeState?.paidEarlier;
+    return html`<div class="panel">
+      <div class="panel-title">Your capture is ready ${large ? this.info("Over 100 MB, so it is priced by size. Closing the popup pauses the upload; reopen it to carry on.") : ""}</div>
+      ${this.sourceUrl && !this.privateSelected ? html`<p class="panel-sub">Page: ${this.sourceUrl}</p>` : ""}
+      <p class="panel-sub">Size: ${(size / 1024 / 1024).toFixed(2)} MB</p>
+      ${line ? html`<p class="panel-sub">${line}</p>` : ""}
+      ${keepsUntilPaid ? html`<p class="panel-sub">Kept in this browser until you pay.</p>` : ""}
+      ${this.largeState?.paidEarlier ? html`<p>An earlier payment covers this. Nothing more to pay.</p>` : ""}
+      ${this.largeQuote !== null && !this.largeState?.paidEarlier ? html`<p>Total: $${(this.largeQuote / 100).toFixed(2)}</p>` : ""}
+      ${this.errorMsg ? html`<p class="error-text">${this.errorMsg}</p>` : ""}
+      ${claimable ? html`<button class="primary" @click=${this.onClaimLocalCapture}>Add to my account</button>` : ""}
+      ${canUpload
+        ? html`<button class="primary" ?disabled=${this.largeBusy} @click=${this.uploadCapture}>${this.packageButtonLabel}</button>` : ""}
+      ${this.largeState?.checkoutUrl && canUpload ? html`<button class="secondary" @click=${() => this.openTab(this.largeState!.checkoutUrl!)}>Reopen checkout</button>` : ""}
+      ${!this.walletAddress ? html`<button class="primary" @click=${this.onEmailSignIn}>Sign in with email</button>${this.renderEmailGrant()}` : ""}
+      <button class="secondary" @click=${this.onDownloadCapture}>${this.privateSelected ? "Download sealed copy" : "Download this capture"}</button>
+      <button class="secondary" title="It stays in your local library." @click=${this.onSetAsidePending}>Set aside this capture</button>
+    </div>`;
+  }
+
   renderEmailGrant() {
-    return this.emailGrant ? html`<p class="helper">Enter this code on the approval page: <strong>${this.emailGrant.userCode}</strong>. Only approve a request you started in this extension.</p>
-      <button class="secondary" ?disabled=${this.signingIn} @click=${this.onCheckEmailSignIn}>Check sign-in approval</button>` : "";
+    return this.emailGrant ? html`<p class="helper">Enter this code on the website: <strong>${this.emailGrant.userCode}</strong>. Only approve a request you started here.</p>
+      <button class="secondary" ?disabled=${this.signingIn} @click=${this.onCheckEmailSignIn}>I've approved it</button>` : "";
   }
 
   renderSignedOut() {
     return html`
       <p class="tagline">
-        Record this page from your browser and send it to Permavault.
+        Save any page, with proof anyone can check.
       </p>
       <button class="primary" ?disabled=${this.signingIn} @click=${this.onEmailSignIn}>Sign in with email</button>
-      <p class="helper">Sign in on the website, then approve this extension using the code shown here.</p>
+      <p class="helper">How sign-in works ${this.info("Sign in on the website, then enter the code shown here to approve this extension.")}</p>
       ${this.renderEmailGrant()}
-      <button class="secondary" ?disabled=${!this.canRecord} @click=${this.onArchiveClick}>Record a local package</button>
-      <details><summary>Existing key-file account</summary>
+      <button class="secondary" ?disabled=${!this.canRecord} @click=${this.onArchiveClick}>Save to this browser only</button>
+      <details><summary>Sign in with a key file</summary>
       <label class="file-button">
         <input
           type="file"
@@ -1813,7 +1852,7 @@ class PermavaultPopup extends LitElement {
       ${this.keyFileName
         ? html`<div class="file-name">${this.keyFileName}</div>`
         : ""}
-      <div class="or">or paste your key JSON</div>
+      <div class="or">or paste its contents</div>
       <textarea
         rows="4"
         placeholder="Paste the contents of your key file"
@@ -1827,14 +1866,12 @@ class PermavaultPopup extends LitElement {
       >
         ${this.signingIn ? "Signing in..." : "Sign in"}
       </button>
+      <p class="helper">
+        How key-file sign-in works ${this.info("Your key file is sent securely. Permavault keeps an encrypted copy while you are signed in, and this browser saves it to renew your sign-in.")}
+      </p></details>
       ${this.keyError
         ? html`<p class="error-text">${this.keyError}</p>`
         : ""}
-      <p class="helper">
-        Key-file sign-in sends the file to Permavault over HTTPS. An encrypted
-        copy is held for the server session, and this browser saves it for
-        sign-in renewal. Email sign-in does not need a key file.
-      </p></details>
     `;
   }
 
@@ -1860,24 +1897,23 @@ class PermavaultPopup extends LitElement {
       <label class="private-choice">
         <input type="checkbox" .checked=${this.privateSelected}
           @change=${(event: Event) => { this.privateSelected = (event.target as HTMLInputElement).checked; this.errorMsg = ""; }} />
-        <span><strong>Private</strong><small>Locked before it leaves your browser. $1.99 to keep a save up to 10 MB.</small></span>
+        <span><strong>Private</strong><small>Sealed before upload. Only your vault can open it.</small></span>
       </label>
-      ${this.privateSelected && !this.privateVaultReady ? html`<p class="note">${this.privateVaultMessage || "Checking your Private Vault..."} <button class="link" @click=${() => this.openTab(`${VAULT_HOME}/settings`)}>Open Private Vault settings</button></p>` : ""}
+      <p class="note"><button class="link" @click=${() => this.openTab(`${VAULT_HOME}/private`)}>How Private works</button></p>
+      ${this.privateSelected && !this.privateVaultReady ? html`<p class="note">${this.privateVaultMessage || "Checking your Private Vault…"} ${this.privateVaultMessage === VAULT_SETUP_MESSAGE ? html`<button class="link" @click=${() => this.openTab(`${VAULT_HOME}/settings`)}>Set up Private Vault</button>` : ""}</p>` : ""}
       ${this.errorMsg ? html`<p class="error-text">${this.errorMsg}</p>` : ""}
       <button
         class="primary big"
         ?disabled=${!this.canRecord}
         @click=${this.onArchiveClick}
       >
-        ${this.privateSelected ? "Save privately" : "Record and upload this page"}
+        ${this.privateSelected ? "Save privately" : "Save this page"}
       </button>
       ${!this.canRecord
-        ? html`<p class="note">This kind of page can't be archived.</p>`
+        ? html`<p class="note">This kind of page can't be saved.</p>`
         : ""}
       ${this.outOfCaptures && !this.privateSelected
-        ? html`<p class="note">
-            You can still record. Eligible saves up to 10 MB are held free for 7 days; permanent storage costs $0.99. Larger captures need payment after we measure the package.
-          </p>`
+        ? html`<p class="note">Pages up to 10 MB still save free for 7 days.</p>`
         : ""}
     `;
   }
@@ -1889,7 +1925,7 @@ class PermavaultPopup extends LitElement {
         <div class="status-text">${this.captureStatusLine}</div>
         ${this.numPending > 0
           ? html`<div class="sub-status">
-              ${this.numPending} resources still saving.
+              ${this.numPending} ${this.numPending === 1 ? "item" : "items"} left
             </div>`
           : ""}
       </div>
@@ -1898,7 +1934,7 @@ class PermavaultPopup extends LitElement {
         ?disabled=${this.stopping || this.stopRequested}
         @click=${this.onStopClick}
       >
-        Stop
+        Finish now
       </button>
     `;
   }
@@ -1911,8 +1947,8 @@ class PermavaultPopup extends LitElement {
           : ""}
         <div class="status-text">
           ${this.uploadStage === "processing"
-            ? "Processing your capture."
-            : "Sending to your vault."}
+            ? "Finishing on Permavault…"
+            : "Sending to Permavault…"}
         </div>
         ${this.uploadPercent !== null
           ? html`
@@ -1925,6 +1961,7 @@ class PermavaultPopup extends LitElement {
               <div class="sub-status">${this.uploadPercent}%</div>
             `
           : ""}
+        ${this.largeState?.orderId || this.largeState?.paidEarlier ? html`<div class="sub-status">Paid. Keep this popup open until it finishes.</div>` : ""}
       </div>
     `;
   }
@@ -1934,19 +1971,17 @@ class PermavaultPopup extends LitElement {
       const expiry = serverExpiryDate(this.stagedExpiresAt);
       return html`
         <div class="panel">
-          <div class="panel-title">${this.privateSelected ? "Private save held temporarily" : "Saved temporarily, not permanent"}</div>
+          <div class="panel-title">${this.privateSelected ? "Saved privately for 7 days" : "Saved free for 7 days"}</div>
           <p class="panel-sub">
-            ${expiry
-              ? `Expires ${expiry.toLocaleString(undefined, { timeZoneName: "short" })}.`
-              : "The server did not provide an expiry. Check History before relying on this save."}
-            ${this.privateSelected
-              ? "Unpaid saves are deleted at expiry. Making it permanent costs $1.99. The stored archive remains locked; open it through your Private Vault."
-              : "Unpaid saves are deleted at expiry. Making it permanent costs $0.99 and publishes the readable archive on Arweave."}
+            ${expiry ? temporaryLine(expiry) : "Check History for when this save expires."}
+            ${this.info(this.privateSelected
+              ? "Make it permanent before then, or it is deleted. It stays sealed; only your vault can open it."
+              : "Make it permanent before then, or it is deleted. Once permanent, anyone with its link can view it.")}
           </p>
-          ${this.uploadId ? html`<button class="primary" ?disabled=${this.checkoutBusy} @click=${this.onMakePermanent}>${this.privateSelected ? "Make permanent for $1.99 in Permavault" : "Make permanent for $0.99"}</button>` : ""}
+          ${this.uploadId ? html`<button class="primary" title="${this.privateSelected ? "Opens Permavault to confirm and pay." : ""}" ?disabled=${this.checkoutBusy} @click=${this.onMakePermanent}>${this.privateSelected ? html`Make permanent for $1.99 <span aria-hidden="true">↗</span>` : "Make permanent for $0.99"}</button>` : ""}
           ${this.errorMsg ? html`<p class="error-text">${this.errorMsg}</p>` : ""}
           <button class="secondary" @click=${this.onOpenHistory}>View in History</button>
-          <button class="secondary" @click=${this.onArchiveAnother}>Archive another page</button>
+          <button class="secondary" @click=${this.onArchiveAnother}>Save another page</button>
         </div>
       `;
     }
@@ -1954,17 +1989,15 @@ class PermavaultPopup extends LitElement {
       return html`
         <div class="panel">
           <div class="done-mark">&#10003;</div>
-          <div class="panel-title">${this.doneKind === "existing" ? "Already in permanent storage" : "Submitted to permanent storage"}</div>
-          <p class="panel-sub">
-            ${this.privateSelected
-              ? "This locked archive was submitted to permanent storage. Check History to open it with your Private Vault."
-              : "This archive was submitted to public permanent storage. Its link may take time to become available. Check History for storage and proof status."}
-          </p>
+          <div class="panel-title">${this.doneKind === "existing" ? "Already saved permanently" : "Sent to permanent storage"}
+            ${this.info(this.privateSelected
+              ? "It stays sealed. Open it from History with your Private Vault."
+              : "Its link can take a few minutes to work. History shows storage and proof status.")}</div>
           <button class="primary" @click=${this.onViewInVault}>
-            View in vault
+            Open in Permavault
           </button>
           <button class="secondary" @click=${this.onArchiveAnother}>
-            Archive another page
+            Save another page
           </button>
         </div>
       `;
@@ -1972,15 +2005,13 @@ class PermavaultPopup extends LitElement {
 
     return html`
       <div class="panel">
-        <div class="panel-title">Check capture status</div>
+        <div class="panel-title">Check History for the result</div>
         <p class="panel-sub">
-          The upload's final status is not confirmed here.
-          Check History for completion, any temporary-save expiry, and storage
-          and proof status. A disconnected progress display does not confirm permanence.
+          We could not confirm it here. ${this.info("History shows whether it finished, any 7-day deadline, and its proof.")}
         </p>
-        <button class="primary" @click=${this.onOpenHistory}>Check History</button>
+        <button class="primary" @click=${this.onOpenHistory}>View in History</button>
         <button class="secondary" @click=${this.onArchiveAnother}>
-          Archive another page
+          Save another page
         </button>
       </div>
     `;

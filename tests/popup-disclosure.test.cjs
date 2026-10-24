@@ -77,7 +77,7 @@ function popup(confirm = () => true, result = { status: 202, json: { jobId: "job
   const instance = new exports.PermavaultPopup();
   instance.walletAddress = 'account';
   instance.refreshBalance = async () => {};
-  return { serverExpiryDate: exports.serverExpiryDate, instance, large, handlers: () => handlers, uploads: () => uploads, privateUploads: () => privateUploads, pending: () => pending, local,
+  return { serverExpiryDate: exports.serverExpiryDate, temporaryLine: exports.temporaryLine, instance, large, handlers: () => handlers, uploads: () => uploads, privateUploads: () => privateUploads, pending: () => pending, local,
     ports: () => ports,
     setJobStatus: value => { jobStatus = value; }, setWsReject: value => { wsReject = value; }, setWsHang: value => { wsHang = value; },
     runTimer: async delay => { const callback = timers.get(delay); assert.ok(callback, `timer ${delay} exists`); await callback(); },
@@ -138,7 +138,7 @@ test('resumed capture cannot upload without destination acceptance', async () =>
   harness.instance.waczBlob = new Blob(['archive']);
   await harness.instance.uploadCapture();
   assert.equal(harness.uploads(), 0);
-  assert.match(harness.instance.errorMsg, /Upload cancelled/);
+  assert.match(harness.instance.errorMsg, /^Cancelled\./);
 });
 
 test('accepted recording starts and carries acceptance to upload', async () => {
@@ -151,9 +151,9 @@ test('accepted recording starts and carries acceptance to upload', async () => {
   await instance.onArchiveClick();
   assert.equal(message.type, 'startRecording');
   assert.equal(instance.destinationAccepted, true);
-  assert.match(notice, /logged-in or personal content/);
-  assert.match(notice, /sent to Permavault with readable contents/);
-  assert.match(notice, /7 days/);
+  assert.match(notice, /signed in to see/);
+  assert.match(notice, /anyone with its link can view it/);
+  assert.match(notice, /free for 7 days/);
 });
 
 test('a disconnected popup port reconnects and registers the tab before recording', () => {
@@ -176,7 +176,7 @@ test('a lost connection before start is reported without claiming nothing was se
   h.ports()[0].onDisconnectHandler();
   assert.equal(h.instance.port, null);
   assert.equal(h.instance.phase, 'error');
-  assert.match(h.instance.errorMsg, /Check the local library/);
+  assert.match(h.instance.errorMsg, /Check your local library/);
   assert.doesNotMatch(h.instance.errorMsg, /Nothing was sent/);
 });
 
@@ -186,7 +186,7 @@ test('background start failure is surfaced to the popup', () => {
   h.instance.waitingForStart = true;
   h.instance.onMessage({ type: 'startRecordingFailed' });
   assert.equal(h.instance.phase, 'error');
-  assert.match(h.instance.errorMsg, /could not start/);
+  assert.match(h.instance.errorMsg, /didn't start/);
 });
 
 test('staged completion does not claim permanent storage and links to History', async () => {
@@ -194,8 +194,8 @@ test('staged completion does not claim permanent storage and links to History', 
   await harness.instance.trackUploadJob('job');
   harness.handlers().onComplete({ uploadId: 'save', staged: true });
   assert.equal(harness.instance.doneKind, 'staged');
-  assert.match(harness.instance.renderDone(), /Saved temporarily, not permanent/);
-  assert.doesNotMatch(harness.instance.renderDone(), /Archived permanently/);
+  assert.match(harness.instance.renderDone(), /Saved free for 7 days/);
+  assert.doesNotMatch(harness.instance.renderDone(), /Sent to permanent storage/);
   let url;
   harness.instance.openTab = value => { url = value; };
   harness.instance.onOpenHistory();
@@ -211,7 +211,7 @@ test('disconnected progress reads the durable temporary-save receipt', async () 
   harness.handlers().onWsError();
   await new Promise(setImmediate);
   assert.equal(harness.instance.doneKind, 'staged');
-  assert.match(harness.instance.renderDone(), /Saved temporarily, not permanent/);
+  assert.match(harness.instance.renderDone(), /Saved free for 7 days/);
 });
 
 test('pending durable job remains uncertain after the status deadline', async () => {
@@ -219,7 +219,7 @@ test('pending durable job remains uncertain after the status deadline', async ()
   await harness.instance.trackUploadJob('job');
   await harness.runTimer(120000);
   assert.equal(harness.instance.doneKind, 'finishing');
-  assert.match(harness.instance.renderDone(), /final status is not confirmed/);
+  assert.match(harness.instance.renderDone(), /Check History for the result/);
 });
 
 test('status request that never replies cannot block the History fallback', async () => {
@@ -229,7 +229,7 @@ test('status request that never replies cannot block the History fallback', asyn
   harness.handlers().onWsError();
   await harness.runTimer(120000);
   assert.equal(harness.instance.doneKind, 'finishing');
-  assert.match(harness.instance.renderDone(), /final status is not confirmed/);
+  assert.match(harness.instance.renderDone(), /Check History for the result/);
 });
 
 test('missing progress channel and stalled status still reach History fallback', async () => {
@@ -301,7 +301,7 @@ test('zero balance still allows recording and staging upload', async () => {
 test('staged result uses exact server expiry and offers checkout', async () => {
   const h = popup();
   h.instance.completeCapture({ uploadId: 'save', staged: true, stagedExpiresAt: '2026-10-01T12:00:00Z', txId: null });
-  assert.match(h.instance.renderDone(), /Expires /);
+  assert.match(h.instance.renderDone(), /Temporary · /);
   assert.match(h.instance.renderDone(), /Make permanent for \$0.99/);
   let url;
   h.instance.openTab = value => { url = value; };
@@ -309,11 +309,12 @@ test('staged result uses exact server expiry and offers checkout', async () => {
   assert.equal(url, 'https://checkout.stripe.com/test');
 });
 
-test('a private save is made permanent on its page in Permavault, where the acknowledgement is asked (PV-470)', async () => {
+test('a private save is made permanent on its page in Permavault (PV-470)', async () => {
   const h = popup();
   h.instance.privateSelected = true;
   h.instance.completeCapture({ uploadId: 'private-save', staged: true, stagedExpiresAt: '2026-10-01T12:00:00Z', txId: null });
-  assert.match(h.instance.renderDone(), /Make permanent for \$1.99 in Permavault/);
+  assert.match(h.instance.renderDone(), /Make permanent for \$1.99 <span aria-hidden="true">↗/);
+  assert.match(h.instance.renderDone(), /Opens Permavault to confirm and pay/);
   let url;
   h.instance.openTab = value => { url = value; };
   await h.instance.onMakePermanent();
@@ -328,7 +329,7 @@ test('only transaction evidence supports permanent or already-existing outcomes'
   assert.equal(instance.doneKind, 'finishing');
   instance.completeCapture({ uploadId: 'save', txId: 'transaction', alreadyArchived: true });
   assert.equal(instance.doneKind, 'existing');
-  assert.match(instance.renderDone(), /Already in permanent storage/);
+  assert.match(instance.renderDone(), /Already saved permanently/);
   instance.completeCapture({ uploadId: 'save', txId: 'transaction' });
   assert.equal(instance.doneKind, 'vault');
 });
@@ -362,7 +363,7 @@ test('server failure is uncertain, not a promise of future success', async () =>
   await h.instance.uploadCapture();
   assert.equal(h.instance.doneKind, 'finishing');
   assert.equal(h.pending().submitted, true);
-  assert.match(h.instance.renderDone(), /final status is not confirmed/);
+  assert.match(h.instance.renderDone(), /Check History for the result/);
 });
 
 
@@ -462,7 +463,7 @@ test('measured package above free threshold requires review before spending', as
   assert.equal(h.instance.phase, 'review-capture');
   assert.equal(h.uploads(), 0);
   assert.equal(h.pending().blob, blob);
-  assert.match(h.instance.renderMain(), /costs \$4.99/);
+  assert.match(h.instance.renderMain(), /1 prepaid capture \(\$4.99 each\)/);
 });
 
 test('reopening restores unpaid exact bytes without automatic resubmission', async () => {
@@ -511,9 +512,9 @@ test('cross-account restored package is download-only and preserves its original
   h.setSession({ walletAddress: 'account-b' });
   await h.instance.initSession();
   assert.equal(h.instance.pendingAccountMismatch, true);
-  assert.match(h.instance.renderMain(), /different sign-in/);
-  assert.match(h.instance.renderMain(), /Captured page: https:\/\/example.com\/account-a/);
-  assert.doesNotMatch(h.instance.renderMain(), /Continue with this package/);
+  assert.match(h.instance.renderMain(), /Saved under another account/);
+  assert.match(h.instance.renderMain(), /Page: https:\/\/example.com\/account-a/);
+  assert.doesNotMatch(h.instance.renderMain(), />Save this page</);
   await h.instance.uploadCapture();
   assert.equal(h.uploads(), 0);
   assert.equal(h.pending().account, 'account');
@@ -521,7 +522,7 @@ test('cross-account restored package is download-only and preserves its original
   await h.instance.signInWithKeyText('{}');
   assert.equal(h.instance.pendingAccountMismatch, false);
   assert.equal(h.instance.destinationAccepted, false);
-  assert.match(h.instance.renderMain(), /Continue with this package/);
+  assert.match(h.instance.renderMain(), />Save this page</);
 });
 
 test('signing back into original account does not resubmit an already sent package', async () => {
@@ -548,9 +549,9 @@ test('signed-out capture promises local storage and never authorizes automatic u
   h.instance.sendMessage = () => {};
   h.instance.captureViewportScreenshot = () => {};
   await h.instance.onArchiveClick();
-  assert.match(notice, /^Record a local package\?/);
-  assert.match(notice, /not uploaded to Permavault or published/);
-  assert.doesNotMatch(notice, /records and uploads automatically/);
+  assert.match(notice, /^Save to this browser only\?/);
+  assert.match(notice, /Nothing is uploaded/);
+  assert.doesNotMatch(notice, /anyone with its link/);
   assert.equal(h.instance.destinationAccepted, false);
   assert.equal(h.instance.pendingAccount, '');
   assert.doesNotMatch(h.instance.renderHeader(), /Sign out/);
@@ -565,15 +566,15 @@ test('signed-out capture promises local storage and never authorizes automatic u
   assert.equal(h.instance.pendingAccount, '');
 });
 
-test('signed-in recording keeps explicit public upload disclosure', async () => {
+test('signed-in recording keeps the regular-capture disclosure', async () => {
   let notice;
   const { instance } = popup(value => { notice = value; return true; });
   instance.sendMessage = () => {};
   instance.captureViewportScreenshot = () => {};
   await instance.onArchiveClick();
-  assert.match(notice, /^Record and upload this page\?/);
-  assert.match(notice, /public permanent storage/);
-  assert.match(notice, /records and uploads automatically/);
+  assert.match(notice, /^Save this page\?/);
+  assert.match(notice, /anyone with its link can view it/);
+  assert.match(notice, /right to share/);
   assert.equal(instance.destinationAccepted, true);
   assert.match(instance.renderHeader(), /Sign out/);
 });
@@ -610,7 +611,7 @@ test('Private intent survives reopening and cannot fall into public upload', asy
   await h.instance.uploadCapture();
   assert.equal(h.uploads(), 0);
   assert.equal(h.privateUploads(), 0);
-  assert.match(h.instance.errorMsg, /could not be locked/);
+  assert.match(h.instance.errorMsg, /couldn't be sealed, so nothing was sent/);
   h.instance.refreshTabInfo = () => {};
   h.instance.onTryAgain();
   assert.equal(h.instance.phase, 'idle');
@@ -619,7 +620,7 @@ test('Private intent survives reopening and cannot fall into public upload', asy
 
 
 test('server expiry preserves UTC across a local date boundary and explicit ISO offsets', () => {
-  const { serverExpiryDate, instance } = popup();
+  const { serverExpiryDate, temporaryLine, instance } = popup();
   const prior = process.env.TZ;
   process.env.TZ = 'America/Los_Angeles';
   try {
@@ -632,11 +633,14 @@ test('server expiry preserves UTC across a local date boundary and explicit ISO 
     assert.equal(serverExpiryDate('2026-10-01T00:30:00').getTime(), sqlite.getTime());
     assert.equal(serverExpiryDate('2026-10-01 10:39:00').toISOString(), '2026-10-01T10:39:00.000Z');
     instance.doneKind = 'staged'; instance.stagedExpiresAt = '2026-10-01 00:30:00';
-    assert.match(instance.renderDone(), /Expires/);
-    assert.ok(instance.renderDone().includes(sqlite.toLocaleString(undefined, { timeZoneName: 'short' })));
+    assert.match(instance.renderDone(), /Temporary · /);
+    // The moment is named in the reader's own time, with the zone.
+    const moment = sqlite.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+    assert.ok(temporaryLine(sqlite, sqlite.getTime() - 3 * 86400000).includes(`3 days left, until ${moment}`));
+    assert.equal(temporaryLine(sqlite, sqlite.getTime() + 1), 'Temporary · ending now');
     instance.stagedExpiresAt = 'not-a-date';
     assert.equal(serverExpiryDate('not-a-date'), null);
-    assert.match(instance.renderDone(), /server did not provide an expiry/);
+    assert.match(instance.renderDone(), /Check History for when this save expires/);
   } finally { if (prior === undefined) delete process.env.TZ; else process.env.TZ = prior; }
 });
 
@@ -657,12 +661,12 @@ test('PV-536: a payment the account already has for this package is used: no pri
   assert.equal(uploadedWith.paidEarlier, true);
   // Asked once, about using the payment, never about a price.
   assert.equal(asked.filter((text) => /costs/.test(text)).length, 0);
-  assert.equal(asked.filter((text) => /An earlier payment covers this package/.test(text)).length, 1);
+  assert.equal(asked.filter((text) => /An earlier payment covers this capture/.test(text)).length, 1);
   assert.equal(harness.instance.phase, 'uploading');
 });
 
 test('PV-536: declining to use the earlier payment changes nothing', async () => {
-  const harness = popup((text) => !/An earlier payment covers this package/.test(text));
+  const harness = popup((text) => !/An earlier payment covers this capture/.test(text));
   harness.large.coveringLargePayment = async () => 'earlier-order';
   harness.large.uploadLargeCapture = async () => assert.fail('uploaded after the customer declined');
   harness.instance.waczBlob = new Blob(['large package']);
@@ -697,7 +701,7 @@ test('PV-536: a checkout that closed unpaid is let go, so the next press opens a
   assert.equal(state.orderId, undefined);
   assert.equal(state.checkoutSessionId, undefined);
   assert.notEqual(state.checkoutOperationId, 'old-checkout-op');
-  assert.match(harness.instance.errorMsg, /closed without a payment, so nothing was charged\. Press Continue with this package to pay\./);
+  assert.match(harness.instance.errorMsg, /closed without payment, so nothing was charged\. Press See price to try again\./);
 });
 
 test('PV-536: a payment taken by another upload meanwhile is let go, so the next press looks again', async () => {
@@ -710,7 +714,7 @@ test('PV-536: a payment taken by another upload meanwhile is let go, so the next
   const state = harness.instance.largeState;
   assert.equal(state.orderId, undefined);
   assert.equal(state.paidEarlier, undefined);
-  assert.match(harness.instance.errorMsg, /no longer free\. Nothing more was charged/);
+  assert.match(harness.instance.errorMsg, /already in use\. Nothing more was charged/);
   // The next press looks for a payment again and, finding none, prices the package.
   let priced = false;
   harness.large.coveringLargePayment = async () => null;
@@ -720,3 +724,48 @@ test('PV-536: a payment taken by another upload meanwhile is let go, so the next
   assert.equal(priced, true);
 });
 
+
+test('large-capture labels follow the payment state and never claim a payment that did not happen', () => {
+  const h = popup();
+  const i = h.instance;
+  i.phase = 'review-capture';
+  i.waczBlob = { size: 200 * 1024 * 1024 };
+  i.destinationAccepted = true;
+  assert.match(i.renderMain(), />See price</);
+  assert.match(i.renderMain(), /Kept in this browser until you pay/);
+  i.largeBusy = true;
+  assert.match(i.renderMain(), /Getting your price/);
+  // Checking an open checkout is not fetching a price.
+  i.largeState = { account: 'account', operationId: 'op', checkoutOperationId: 'c', orderId: 'order', checkoutSessionId: 's', checkoutUrl: 'https://checkout.stripe.com/c' };
+  assert.match(i.renderMain(), />Upload now</);
+  assert.doesNotMatch(i.renderMain(), /until you pay/);
+  i.largeBusy = false;
+  i.largeState = { account: 'account', operationId: 'op', checkoutOperationId: 'c' };
+  i.phase = 'uploading';
+  assert.doesNotMatch(i.renderMain(), /Paid\./);
+  i.largeState.paidEarlier = true; i.largeState.orderId = 'earlier';
+  assert.match(i.renderMain(), /Paid\. Keep this popup open/);
+});
+
+test('an account with captures included is never asked for a price or told it paid', () => {
+  const h = popup();
+  const i = h.instance;
+  i.phase = 'review-capture';
+  i.balanceUnlimited = true;
+  i.waczBlob = { size: 200 * 1024 * 1024 };
+  assert.match(i.renderMain(), />Upload now</);
+  assert.doesNotMatch(i.renderMain(), /See price|until you pay/);
+  i.waczBlob = { size: 20 * 1024 * 1024 };
+  assert.doesNotMatch(i.renderMain(), /\$4\.99|Use 1 capture/);
+});
+
+test('a capture waiting after sign-out reads as signed out, not as another account', () => {
+  const h = popup();
+  const i = h.instance;
+  i.phase = 'review-capture';
+  i.waczBlob = { size: 1024 };
+  i.pendingAccount = 'account';
+  i.walletAddress = '';
+  assert.match(i.renderMain(), /Sign in to make it permanent/);
+  assert.doesNotMatch(i.renderMain(), /another account/);
+});

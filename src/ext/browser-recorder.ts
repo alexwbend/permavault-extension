@@ -254,28 +254,28 @@ class BrowserRecorder extends Recorder {
     if (this.running) {
       // @ts-expect-error - TS2339 - Property 'behaviorState' does not exist on type 'BrowserRecorder'.
       if (this.behaviorState === BEHAVIOR_RUNNING) {
-        title = "Archiving: Autopilot Running!";
+        title = "Saving this page…";
         color = "#0096ff";
         text = " ";
         // @ts-expect-error - TS2339 - Property 'numPending' does not exist on type 'BrowserRecorder'.
       } else if (this.numPending === 0) {
-        title = "Archiving: No URLs pending, can continue";
+        title = "Page saved, finishing up";
         color = "#4d7c0f";
         text = "✓";
       } else {
         // @ts-expect-error - TS2339 - Property 'numPending' does not exist on type 'BrowserRecorder'.
-        title = `Archiving: ${this.numPending} URLs pending, please wait`;
+        title = `Saving, ${this.numPending} ${this.numPending === 1 ? "item" : "items"} left`;
         color = "#c5a802";
         // @ts-expect-error - TS2339 - Property 'numPending' does not exist on type 'BrowserRecorder'.
         text = "" + this.numPending;
       }
       // @ts-expect-error - TS2339 - Property 'failureMsg' does not exist on type 'BrowserRecorder'.
     } else if (this.failureMsg) {
-      title = "Error: Can't Archive this page";
+      title = "This page can't be saved";
       text = "X";
       color = "#d30808";
     } else {
-      title = "Not Archiving";
+      title = "Permavault";
       text = "";
       color = "#4d7c0f";
     }
