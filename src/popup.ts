@@ -1494,12 +1494,19 @@ class PermavaultPopup extends LitElement {
       }
 
       button:focus-visible,
-      .file-button:focus-within,
-      .private-choice:focus-within,
+      .file-button:has(input:focus-visible),
+      .private-choice:has(input:focus-visible),
       summary:focus-visible,
       .info:focus-visible {
         outline: 2px solid var(--pv-accent);
         outline-offset: 2px;
+      }
+
+      .band .info:focus-visible,
+      .primary:focus-visible,
+      .private-choice.on:has(input:focus-visible) {
+        outline-color: #fff;
+        box-shadow: 0 0 0 4px var(--pv-accent);
       }
 
       .primary,
@@ -1688,6 +1695,7 @@ class PermavaultPopup extends LitElement {
         font-size: 13px;
         line-height: 18px;
         color: var(--pv-muted);
+        overflow-wrap: anywhere;
       }
 
       /* A dark band across the top of a card, for a private result. */
@@ -1798,6 +1806,10 @@ class PermavaultPopup extends LitElement {
 
       .more button + button {
         box-shadow: inset 0 0.5px 0 rgba(0, 0, 0, 0.08);
+      }
+
+      .more button:focus-visible {
+        outline-offset: -2px;
       }
 
       .more button:hover {
@@ -1982,6 +1994,7 @@ class PermavaultPopup extends LitElement {
         font-size: 13px;
         line-height: 18px;
         color: var(--pv-fail-ink);
+        overflow-wrap: anywhere;
       }
 
       .page-card {
@@ -2102,7 +2115,7 @@ class PermavaultPopup extends LitElement {
         display: flex;
         justify-content: flex-start;
         border-radius: 999px;
-        background: rgba(120, 120, 128, 0.32);
+        background: #8e8e93;
         transition: background 0.15s ease;
       }
 
@@ -2283,7 +2296,6 @@ class PermavaultPopup extends LitElement {
 
       case "packaging":
         return html`
-          ${this.pageUrl ? this.renderPageCard() : ""}
           <section class="card">
             <div class="status-block" role="status">
               <span class="ring"><span class="spinner"></span></span>
@@ -2492,7 +2504,6 @@ class PermavaultPopup extends LitElement {
 
   renderCapturing() {
     return html`
-      ${this.pageUrl ? this.renderPageCard() : ""}
       <section class="card">
         <div class="status-block" role="status">
           <span class="ring"><span class="spinner"></span></span>
@@ -2529,7 +2540,7 @@ class PermavaultPopup extends LitElement {
         </div>
         ${this.uploadPercent !== null
           ? html`
-              <div class="progress" role="progressbar" aria-valuenow="${this.uploadPercent}" aria-valuemin="0" aria-valuemax="100">
+              <div class="progress" role="progressbar" aria-label="Upload progress" aria-valuenow="${this.uploadPercent}" aria-valuemin="0" aria-valuemax="100">
                 <div
                   class="progress-fill"
                   style="width: ${this.uploadPercent}%"
