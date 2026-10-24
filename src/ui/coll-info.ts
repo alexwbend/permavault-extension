@@ -2,8 +2,6 @@ import { html, css, wrapCss, apiPrefix } from "replaywebpage";
 
 import prettyBytes from "pretty-bytes";
 
-import fasDownload from "@fortawesome/fontawesome-free/svgs/solid/download.svg";
-import fasUpload from "@fortawesome/fontawesome-free/svgs/solid/upload.svg";
 import fasSync from "@fortawesome/fontawesome-free/svgs/solid/sync-alt.svg";
 import fasCheck from "@fortawesome/fontawesome-free/svgs/solid/check-circle.svg";
 import fasCopy from "@fortawesome/fontawesome-free/svgs/regular/copy.svg";
@@ -16,6 +14,7 @@ import fasCloudArrowUp from "@fortawesome/fontawesome-free/svgs/solid/cloud-uplo
 import { ItemInfo } from "replaywebpage";
 import wrRec from "../assets/icons/recLogo.svg";
 import { type WrRecItem } from "../types";
+import { icon } from "../icons";
 
 const REPLAY_URL = "https://replayweb.page/";
 
@@ -88,8 +87,61 @@ class WrRecCollInfo extends ItemInfo {
       }
 
       .minihead {
-        font-size: 10px;
-        font-weight: bold;
+        margin-bottom: 4px;
+        font-size: 11.5px;
+        font-weight: 600;
+        color: var(--pv-muted, #56565b);
+      }
+
+      .column {
+        font-size: 13.5px;
+        color: var(--pv-ink2, #3a3a3c);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .name {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+      }
+
+      .name .tile {
+        width: 32px;
+        height: 32px;
+        flex: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 9px;
+        background: rgba(72, 72, 74, 0.1);
+        color: #48484a;
+      }
+
+      .name .subtitle {
+        margin: 0;
+        font-size: 14px;
+        line-height: 19px;
+        font-weight: 600;
+        color: var(--pv-ink, #1d1d1f);
+      }
+
+      .name a {
+        color: inherit;
+      }
+
+      .button-row .button {
+        width: 34px;
+        padding: 0;
+      }
+
+      .ic {
+        flex: none;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.5;
+        stroke-linecap: square;
+        stroke-linejoin: miter;
       }
 
       .button-row {
@@ -158,15 +210,18 @@ class WrRecCollInfo extends ItemInfo {
 
     return html`
       <div class="columns">
-        <div class="column is-2">
+        <div class="column is-4">
           <p class="minihead">Name</p>
-          <span class="subtitle has-text-weight-bold">
-            ${detailed || coll?.sourceUrl == null
-              ? html` ${coll?.title} `
-              : html` <a href="?source=${encodeURIComponent(coll.sourceUrl)}"
-                  >${coll?.title}</a
-                >`}
-          </span>
+          <div class="name">
+            <span class="tile" aria-hidden="true">${icon("globe", 15)}</span>
+            <span class="subtitle">
+              ${detailed || coll?.sourceUrl == null
+                ? html` ${coll?.title} `
+                : html` <a href="?source=${encodeURIComponent(coll.sourceUrl)}"
+                    >${coll?.title}</a
+                  >`}
+            </span>
+          </div>
         </div>
 
         <div class="column is-2">
@@ -187,27 +242,21 @@ class WrRecCollInfo extends ItemInfo {
               class="button is-small"
               title="Download WACZ"
             >
-              <span class="icon is-small">
-                <fa-icon aria-hidden="true" .svg="${fasDownload}"></fa-icon>
-              </span>
+              <span class="icon is-small">${icon("download", 15)}</span>
             </a>
             <button
               @click="${this.onShowImport}"
               class="button is-small"
               title="Import File"
             >
-              <span class="icon">
-                <fa-icon aria-hidden="true" .svg="${fasUpload}"></fa-icon>
-              </span>
+              <span class="icon">${icon("upload", 15)}</span>
             </button>
             <button
               @click="${this.onShowStart}"
               class="button is-small"
               title="Start Archiving"
             >
-              <span class="icon">
-                <fa-icon aria-hidden="true" .svg="${wrRec}"></fa-icon>
-              </span>
+              <span class="icon">${icon("record", 15)}</span>
             </button>
           </div>
         </div>

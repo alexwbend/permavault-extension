@@ -5,11 +5,6 @@ import { ReplayWebApp, Embed, Loader } from "replaywebpage";
 
 import { SWManager } from "replaywebpage";
 
-import fasHelp from "@fortawesome/fontawesome-free/svgs/solid/question-circle.svg";
-import fasPlus from "@fortawesome/fontawesome-free/svgs/solid/plus.svg";
-
-import fasUpload from "@fortawesome/fontawesome-free/svgs/solid/upload.svg";
-import fasCog from "@fortawesome/fontawesome-free/svgs/solid/cog.svg";
 
 import "./coll";
 import "./coll-info";
@@ -17,10 +12,13 @@ import "./recordembed";
 import "./coll-index";
 
 import { BtrixClient } from "./upload";
+import type { PropertyValues } from "lit";
+import { graphite, themeElement } from "./graphite";
+import { icon } from "../icons";
+import { VAULT_HOME } from "../pv/auth";
 
 import wrRec from "../assets/icons/recLogo.svg";
-import awpLogo from "../assets/brand/archivewebpage-icon-color.svg";
-import awpBrandLockupColor from "../assets/brand/archivewebpage-lockup-color.svg";
+import permavaultMark from "../../assets/permavault-mark.svg";
 import prettyBytes from "pretty-bytes";
 
 import {
@@ -37,6 +35,11 @@ const VERSION = __AWP_VERSION__;
 const DEFAULT_GATEWAY_URL = "https://w3s.link/ipfs/";
 
 const DEFAULT_BTRIX_URL = "https://app.browsertrix.com";
+
+// Every ReplayWeb.page part of the library takes the graphite layer too.
+for (const tag of ["wr-modal", "wr-item", "wr-item-index", "wr-item-info", "wr-loader", "wr-coll-replay", "wr-coll-resources", "wr-page-view", "wr-page-entry", "wr-gdrive", "wr-chooser", "wr-sorter", "wr-rec-coll", "wr-rec-coll-info", "wr-rec-coll-index", "wr-btrix-upload", "archive-web-page"]) {
+  themeElement(tag);
+}
 
 //============================================================================
 class ArchiveWebApp extends ReplayWebApp {
@@ -158,7 +161,7 @@ class ArchiveWebApp extends ReplayWebApp {
   }
 
   get appName() {
-    return "ArchiveWeb.page";
+    return "Permavault";
   }
 
   static get properties() {
@@ -366,7 +369,7 @@ class ArchiveWebApp extends ReplayWebApp {
   }
 
   static get styles() {
-    return wrapCss(ArchiveWebApp.appStyles);
+    return [wrapCss(ArchiveWebApp.appStyles), graphite];
   }
 
   static get appStyles() {
@@ -441,22 +444,173 @@ class ArchiveWebApp extends ReplayWebApp {
       }
 
       ${ReplayWebApp.appStyles}
+
+      :host {
+        background:
+          radial-gradient(70% 55% at 100% 0%, rgba(199, 201, 209, 0.55) 0%, rgba(199, 201, 209, 0) 70%),
+          radial-gradient(60% 50% at 0% 0%, rgba(218, 219, 224, 0.45) 0%, rgba(218, 219, 224, 0) 70%),
+          linear-gradient(180deg, #e3e4e8 0%, #eff0f2 42%, #f5f5f7 100%);
+      }
+
+      .navbar {
+        width: calc(100% - 32px);
+        max-width: 1180px;
+        height: 56px;
+        min-height: 56px;
+        margin: 16px auto 0;
+        padding: 0 16px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.72);
+        backdrop-filter: blur(40px) saturate(1.8);
+        box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.09), inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 10px 24px -16px rgba(0, 0, 0, 0.3);
+      }
+
+      .navbar-brand {
+        height: 56px;
+        gap: 12px;
+      }
+
+      .navbar-menu,
+      .navbar-end {
+        background: transparent;
+        box-shadow: none;
+      }
+
+      a.navbar-item,
+      .navbar-item {
+        color: var(--pv-ink2);
+        font-size: 14px;
+        font-weight: 500;
+        background: transparent;
+        border-radius: 8px;
+      }
+
+      a.navbar-item:hover,
+      a.navbar-item:focus-visible {
+        color: var(--pv-ink);
+        background: var(--pv-fill2);
+      }
+
+      .navbar-item .ic,
+      .home-actions .ic {
+        margin-right: 6px;
+      }
+
+      .brand-logo {
+        display: block;
+        height: 18px;
+        width: auto;
+      }
+
+      .lib-chip {
+        height: 24px;
+        padding: 0 10px;
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        background: var(--pv-fill);
+        color: var(--pv-ink2);
+        font-size: 13px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+
+      .section.less-padding {
+        width: calc(100% - 32px);
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 22px 0 6px;
+      }
+
+      .section.less-padding .message-body {
+        padding: 0;
+      }
+
+      .navbar-item.is-size-6 {
+        font-size: 14px !important;
+      }
+
+      .home-actions {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin: 0 !important;
+      }
+
+      .home-actions .button {
+        margin: 0 !important;
+      }
+
+      .home-actions .infomsg {
+        max-width: none;
+        padding-right: 0;
+        font-size: 13px;
+        color: var(--pv-muted);
+      }
+
+      .home-actions .rightbar {
+        align-items: center;
+        gap: 10px;
+      }
+
+      .settings-button {
+        width: 36px;
+        padding: 0 !important;
+      }
+
+      .ic {
+        flex: none;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.5;
+        stroke-linecap: square;
+        stroke-linejoin: miter;
+      }
+
+      .ic.small {
+        stroke-width: 1.75;
+      }
+
+      .about-mark {
+        width: 56px;
+        height: 56px;
+        margin: 0 auto 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 13px;
+        color: #fff;
+        background: linear-gradient(180deg, #5a5a5d 0%, #2c2c2e 100%);
+      }
+
+      .about-mark fa-icon {
+        color: #fff;
+      }
     `);
   }
 
-  // HACK: returns the logo requested by ReplayWeb.page's nav as nothing now that the new logo includes both graphics and text. Probably best to refactor this behavior.
+  // The icon-only mark, used by ReplayWeb.page's nav when the library is embedded.
   get mainLogo() {
-    return "";
+    return permavaultMark;
+  }
+
+  updated(changedProperties: PropertyValues<this>) {
+    super.updated(changedProperties);
+    // ReplayWeb.page names its home link after itself; this library is Permavault's.
+    this.renderRoot
+      .querySelector(".wr-logo-item")
+      ?.setAttribute("aria-label", "Permavault local library");
   }
 
   renderNavEnd() {
     return html`<a
-        href="https://archiveweb.page/guide"
+        href="${VAULT_HOME}/guide"
         target="_blank"
+        rel="noopener"
         class="navbar-item is-size-6"
       >
-        <fa-icon .svg="${fasHelp}" aria-hidden="true"></fa-icon
-        ><span>&nbsp;User Guide</span>
+        ${icon("external", 15)}<span>User Guide</span>
       </a>
       <a
         href="?about"
@@ -473,13 +627,8 @@ class ArchiveWebApp extends ReplayWebApp {
   }
 
   renderNavBrand() {
-    return html` <fa-icon
-      .svg="${awpBrandLockupColor}"
-      size=""
-      width="9.5rem"
-      height="1.25rem"
-      aria-hidden="true"
-    ></fa-icon>`;
+    return html`<img class="brand-logo" src="./permavault-logo.svg" alt="" />
+      <span class="lib-chip">Local library</span>`;
   }
 
   renderHomeIndex() {
@@ -487,18 +636,16 @@ class ArchiveWebApp extends ReplayWebApp {
       <section class="section less-padding">
         <div class="message is-small">
           <div class="message-body">
-            <div class="buttons">
+            <div class="buttons home-actions">
               <button
-                class="button is-small no-pad-mobile"
+                class="button is-small is-primary no-pad-mobile"
                 title="New Archiving Session"
                 @click="${
                   // @ts-expect-error - TS2339 - Property 'showNew' does not exist on type 'ArchiveWebApp'.
                   () => (this.showNew = "show")
                 }"
               >
-                <span class="icon">
-                  <fa-icon .svg=${fasPlus}></fa-icon>
-                </span>
+                <span class="icon">${icon("plus", 16)}</span>
                 <span class="is-hidden-mobile">New Archiving Session</span>
               </button>
               <button
@@ -506,9 +653,7 @@ class ArchiveWebApp extends ReplayWebApp {
                 title="Import File"
                 @click="${() => (this.showImport = true)}"
               >
-                <span class="icon">
-                  <fa-icon .svg=${fasUpload}></fa-icon>
-                </span>
+                <span class="icon">${icon("upload", 16)}</span>
                 <span class="is-hidden-mobile">Import File</span>
               </button>
               <button
@@ -517,25 +662,21 @@ class ArchiveWebApp extends ReplayWebApp {
                 ?disabled="${!this.colls}"
                 @click="${this.onShowStart}"
               >
-                <span class="icon">
-                  <fa-icon
-                    size="1.0em"
-                    aria-hidden="true"
-                    .svg="${wrRec}"
-                  ></fa-icon>
-                </span>
+                <span class="icon">${icon("record", 16)}</span>
                 <span class="is-hidden-mobile">Start Archiving</span>
               </button>
               <div class="rightbar">
                 <div class="infomsg is-hidden-mobile">
-                  The ArchiveWeb.page ${IS_APP ? "App" : "Extension"} allows you
-                  to archive webpages directly in your browser!
+                  The Permavault ${IS_APP ? "App" : "Extension"} allows you to
+                  archive webpages directly in your browser!
                 </div>
                 <button
-                  class="button is-small"
+                  class="button is-small settings-button"
+                  title="Settings"
+                  aria-label="Settings"
                   @click="${() => (this.showSettings = true)}"
                 >
-                  <fa-icon .svg=${fasCog}></fa-icon>
+                  ${icon("settings", 16)}
                 </button>
               </div>
             </div>
@@ -947,7 +1088,7 @@ class ArchiveWebApp extends ReplayWebApp {
         <div class="modal-background" @click="${this.onAboutClose}"></div>
           <div class="modal-card">
             <header class="modal-card-head">
-              <p class="modal-card-title">About ArchiveWeb.page ${this.getDeployType()}</p>
+              <p class="modal-card-title">About Permavault ${this.getDeployType()}</p>
               <button class="delete" aria-label="close" @click="${
                 this.onAboutClose
               }"></button>
@@ -955,58 +1096,44 @@ class ArchiveWebApp extends ReplayWebApp {
             <section class="modal-card-body">
               <div class="container">
                 <div class="content">
-                  <div class="is-flex">
-                    <div class="has-text-centered" style="width: 220px">
-                      <fa-icon class="logo" size="48px" .svg="${awpLogo}"></fa-icon>
-                      <div style="font-size: smaller; margin-bottom: 1em">${this.getDeployType()} v${VERSION}</div>
-                    </div>
-
-                    ${
-                      IS_APP
-                        ? html`
-                            <p>
-                              ArchiveWeb.page App is a standalone app for Mac,
-                              Windows and Linux that allows users to archive
-                              webpages as they browse
-                            </p>
-                          `
-                        : html` <p>
-                            ArchiveWeb.page allows users to archive webpages
-                            directly in your browser!
-                          </p>`
-                    }
+                  <div class="has-text-centered">
+                    <span class="about-mark"><fa-icon size="34px" .svg="${permavaultMark}" aria-hidden="true"></fa-icon></span>
+                    <div style="font-size: smaller; margin-bottom: 1em">${this.getDeployType()} v${VERSION}</div>
                   </div>
 
-                  <p>See the <a href="https://archiveweb.page/guide" target="_blank">ArchiveWeb.page Guide</a> for more info on how to use this tool.</p>
-
-                  <p>Full source code is available at:
-                    <a href="https://github.com/webrecorder/archiveweb.page" target="_blank">https://github.com/webrecorder/archiveweb.page</a>
+                  <p>
+                    Permavault saves web pages in your browser. Sign in to keep
+                    them on permanent storage with their capture record.
                   </p>
 
-                  <p>ArchiveWeb.page is part of the <a href="https://webrecorder.net/" target="_blank">Webrecorder Project</a>.</p>
+                  <p>See the <a href="${VAULT_HOME}/guide" target="_blank" rel="noopener">Permavault Guide</a> for how to use it.</p>
 
-                  <h3>Privacy Policy</h3>
-                  <p class="is-size-7">ArchiveWeb.page allows users to archive what they browse, storing captured data directly in the browser.
-                  Users can downloaded this data as files to their hard drive. Users can also delete any and all archived data at any time.
-                  ArchiveWeb.page does not collect any usage or tracking data.</p>
+                  <h3>Privacy</h3>
+                  <p class="is-size-7">Pages you save to this browser stay in this browser until you delete them. You can download them as files or delete them at any time.
+                  Pages you send to Permavault are handled as the <a href="${VAULT_HOME}/privacy" target="_blank" rel="noopener">Privacy Policy</a> describes.</p>
 
-                  <p class="is-size-7">ArchiveWeb.page includes an experimental sharing option for each archive collection. Users can choose to share select archives on a peer-to-peer network (IPFS) via a unique id.
-                  Once shared on this network, the data may become accessible to others.
-                  All archived items are private and not shared by default, unless explicitly opted-in by the user. (A warning is displayed when sharing via IPFS.)</p>
+                  <p class="is-size-7">An experimental option can share a saved item on the IPFS peer-to-peer network through a unique link.
+                  Once shared there, others may be able to access it. Nothing is shared this way unless you choose to, and a warning is shown first.</p>
+
+                  <h4>Open source</h4>
+                  <p class="is-size-7">This extension is built on <a href="https://github.com/webrecorder/archiveweb.page" target="_blank" rel="noopener">ArchiveWeb.page</a>
+                  by the <a href="https://webrecorder.net/" target="_blank" rel="noopener">Webrecorder Project</a>, released under the AGPL-3.0 license.
+                  Permavault's source code for it is at
+                  <a href="https://github.com/alexwbend/permavault-extension" target="_blank" rel="noopener">github.com/alexwbend/permavault-extension</a>.</p>
 
                   <h4>Disclaimer of Warranties</h4>
-                  <p class="is-size-7">The application is provided "as is" without any guarantees.</p>
+                  <p class="is-size-7">The software is provided "as is" without any guarantees.</p>
                   <details class="is-size-7">
                     <summary>Legalese:</summary>
-                    <p style="font-size: 0.8rem">DISCLAIMER OF SOFTWARE WARRANTY. WEBRECORDER SOFTWARE PROVIDES THIS SOFTWARE TO YOU "AS AVAILABLE"
+                    <p style="font-size: 0.8rem">DISCLAIMER OF SOFTWARE WARRANTY. THIS SOFTWARE IS PROVIDED "AS AVAILABLE"
                     AND WITHOUT WARRANTY OF ANY KIND, EXPRESS, IMPLIED OR OTHERWISE,
                     INCLUDING WITHOUT LIMITATION ANY WARRANTY OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.</p>
                   </details>
 
                   <div class="has-text-centered">
-                    <a class="button is-warning" href="#" @click="${
+                    <button class="button" @click="${
                       this.onAboutClose
-                    }">Close</a>
+                    }">Close</button>
                   </div>
                 </div>
               </div>

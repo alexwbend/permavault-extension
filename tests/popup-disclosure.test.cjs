@@ -5,6 +5,15 @@ const vm = require('node:vm');
 const ts = require('typescript');
 const path = require('node:path');
 
+// The real icon set, built with the same flattened template tags.
+function loadIcons(template) {
+  const source = fs.readFileSync(path.join(__dirname, '../src/icons.ts'), 'utf8');
+  const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } });
+  const module = { exports: {} };
+  vm.runInNewContext(compiled.outputText, { module, exports: module.exports, require: () => ({ html: template, svg: template }) });
+  return module.exports;
+}
+
 // Exercise the actual popup methods without a browser or network. Lit's
 // template tag is flattened only so result copy can be inspected.
 function popup(confirm = () => true, result = { status: 202, json: { jobId: "job" } }) {
@@ -67,6 +76,7 @@ function popup(confirm = () => true, result = { status: 202, json: { jobId: "job
         removeLocalOption: async key => { local.delete(key); },
       };
       if (name === './pv/pending') return { savePending: async value => { pending = value; }, loadPending: async () => pending, clearPending: async () => { pending = undefined; } };
+      if (name === './icons') return loadIcons(template);
       if (name === './pv/auth') return { VAULT_HOME: 'https://app.permavault.xyz', getStoredSession: async () => session, signInWithJwk: async () => session, signOut: async () => { session = null; } };
       return {};
     },
@@ -514,7 +524,7 @@ test('cross-account restored package is download-only and preserves its original
   await h.instance.initSession();
   assert.equal(h.instance.pendingAccountMismatch, true);
   assert.match(h.instance.renderMain(), /Saved under another account/);
-  assert.match(h.instance.renderMain(), /Page:<\/span><span class="fact-value"[^>]*>https:\/\/example.com\/account-a/);
+  assert.match(h.instance.renderMain(), /Page<\/span><span class="fact-value"[^>]*>https:\/\/example.com\/account-a/);
   assert.doesNotMatch(h.instance.renderMain(), />Save this page</);
   await h.instance.uploadCapture();
   assert.equal(h.uploads(), 0);

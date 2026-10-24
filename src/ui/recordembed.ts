@@ -1,7 +1,6 @@
 import { property } from "lit/decorators.js";
 import { Embed, apiPrefix } from "replaywebpage";
 
-//import awpLogo from "../assets/brand/archivewebpage-icon-color.svg";
 
 // ===========================================================================
 Embed.setDefaultReplayFile("replay.html");
@@ -33,7 +32,7 @@ export class RecordEmbed extends Embed {
     this.replaybase = "./replay/";
     this.replayfile = "record.html";
     this.mainElementName = "archive-web-page-app";
-    this.appName = "Embedded ArchiveWeb.page";
+    this.appName = "Embedded Permavault";
     this.embed = "default";
     this.noWebWorker = true;
 
