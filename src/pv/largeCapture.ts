@@ -12,7 +12,7 @@ async function json(path: string, body?: unknown, account?: string) {
   }, false, account);
   const data = await response.json();
   if (!response.ok) {
-    throw new ServerRefusal(data.message || "The request could not finish. Your package is retained; try again.",
+    throw new ServerRefusal(data.message || "That didn't finish. Your capture is kept in this browser. Try again.",
       response.status, typeof data.error === "string" ? data.error : undefined);
   }
   return { status: response.status, data };
@@ -24,26 +24,21 @@ async function json(path: string, body?: unknown, account?: string) {
 export const PAYMENT_GONE = new Set(["LARGE_MEDIA_ORDER_REQUIRED", "ORDER_IN_USE", "ORDER_SIZE_MISMATCH"]);
 export function stripeUrl(value: string): string {
   const url = new URL(value);
-  if (url.protocol !== "https:" || url.hostname !== "checkout.stripe.com") throw new Error("Checkout address could not be verified.");
+  if (url.protocol !== "https:" || url.hostname !== "checkout.stripe.com") throw new Error("Checkout didn't open. Check History before trying again.");
   return url.href;
 }
 /**
- * PV-475: a capture over 100 MB gives up the 14-day right to cancel once it is
- * stored, so it is paid with the request to start straight away. The line
- * comes from the server (the estimate), is shown before paying, and its
- * version goes back with the checkout, which the server records.
+ * The price of a capture over 100 MB. Since PV-575 row 3 (24 Oct 2026) nothing
+ * is shown above the payment and no acknowledgement is sent: the no-refund
+ * rule lives in Terms section 6, and the server records it on the order.
  */
-export interface WithdrawalAck { version: string; text: string }
-export async function quoteLargeCapture(size: number, account: string): Promise<{ amountCents: number; included: boolean; withdrawalAck?: WithdrawalAck }> {
+export async function quoteLargeCapture(size: number, account: string): Promise<{ amountCents: number; included: boolean }> {
   const { data } = await json("/archive/file/estimate", { fileSize: size, mimeType: "application/wacz" }, account);
-  if (data.estimate?.available === false) throw new Error("Storage is temporarily unavailable. Your local capture is retained.");
+  if (data.estimate?.available === false) throw new Error("Storage is busy right now. Your capture is kept in this browser. Try again soon.");
   if (data.estimate?.pricing !== "dynamic") return { amountCents: 0, included: true };
   const amountCents = data.estimate.quote?.amountCents;
-  if (!Number.isSafeInteger(amountCents) || amountCents <= 0) throw new Error("An exact price is not available yet.");
-  const ack = data.estimate.withdrawalAck;
-  const withdrawalAck = ack && typeof ack.version === "string" && typeof ack.text === "string" && ack.version && ack.text
-    ? { version: ack.version as string, text: ack.text as string } : undefined;
-  return { amountCents, included: false, ...(withdrawalAck ? { withdrawalAck } : {}) };
+  if (!Number.isSafeInteger(amountCents) || amountCents <= 0) throw new Error("We couldn't get your price yet. Try again in a moment.");
+  return { amountCents, included: false };
 }
 /**
  * PV-536: this package's own unused payment, if there is one: an earlier
@@ -60,11 +55,10 @@ export async function coveringLargePayment(size: number, account: string): Promi
 export type LargeCheckout =
   | { orderId: string; checkoutSessionId: string; checkoutUrl: string; amountCents: number }
   | { orderId: string; paidEarlier: true };
-export async function checkoutLargeCapture(size: number, state: LargeCaptureState, ackVersion?: string): Promise<LargeCheckout> {
+export async function checkoutLargeCapture(size: number, state: LargeCaptureState): Promise<LargeCheckout> {
   const response = await authFetch("/payments/large-media", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
       fileSize: size, mimeType: "application/wacz", operationId: state.checkoutOperationId,
-      ...(ackVersion ? { acknowledgedWithdrawal: true, withdrawalAckVersion: ackVersion } : {}),
     }),
   }, false, state.account);
   const data = await response.json();
@@ -73,7 +67,7 @@ export async function checkoutLargeCapture(size: number, state: LargeCaptureStat
     return { orderId: data.orderId as string, paidEarlier: true };
   }
   if (!response.ok) {
-    throw new ServerRefusal(data.message || "The request could not finish. Your package is retained; try again.",
+    throw new ServerRefusal(data.message || "That didn't finish. Your capture is kept in this browser. Try again.",
       response.status, typeof data.error === "string" ? data.error : undefined);
   }
   const url = new URL(data.url);
@@ -81,7 +75,7 @@ export async function checkoutLargeCapture(size: number, state: LargeCaptureStat
     url.searchParams.get("session_id") === data.sessionId && typeof data.sessionId === "string" && data.sessionId.length > 0 &&
     [...url.searchParams.keys()].length === 1 && !url.hash;
   const checkoutUrl = paidReturn ? url.href : stripeUrl(data.url);
-  if (typeof data.orderId !== "string" || !data.orderId || typeof data.sessionId !== "string" || !data.sessionId) throw new Error("Checkout response is incomplete.");
+  if (typeof data.orderId !== "string" || !data.orderId || typeof data.sessionId !== "string" || !data.sessionId) throw new Error("Checkout didn't open. Check History before trying again.");
   return { orderId: data.orderId as string, checkoutSessionId: data.sessionId as string,
     checkoutUrl, amountCents: data.quote.amountCents as number };
 }
@@ -124,12 +118,12 @@ export async function uploadLargeCapture(capture: PendingCapture, state: LargeCa
   const path = `/archive/file/session/${encodeURIComponent(state.sessionId!)}`;
   const { data: session } = await json(path, undefined, capture.account);
   if (session.status === "completing" || session.status === "done") return { status: 202, json: { jobId: state.jobId } };
-  if (session.status !== "open") throw new Error("This upload session is no longer open. Check History and contact support with the retained package before paying again.");
+  if (session.status !== "open") throw new Error("This upload can't continue. Check History, then email hello@permavault.xyz before paying again.");
   let offset = session.offset;
   const chunkSize = session.chunkSize;
   if (!Number.isSafeInteger(offset) || offset < 0 || offset > capture.blob.size || session.size !== capture.blob.size ||
       !Number.isSafeInteger(chunkSize) || chunkSize <= 0 || chunkSize > 16 * 1024 * 1024) {
-    throw new Error("The upload session does not match the saved package.");
+    throw new Error("This upload doesn't match your saved capture. Check History before trying again.");
   }
   while (offset < capture.blob.size) {
     const end = Math.min(offset + chunkSize, capture.blob.size);
@@ -138,13 +132,13 @@ export async function uploadLargeCapture(capture: PendingCapture, state: LargeCa
     }, false, capture.account);
     // On an ambiguous reply stop. Reopening/retrying reads the server offset first.
     const data = await response.json();
-    if (!response.ok || data.offset !== end) throw new Error("Upload paused. Reopen this popup and continue the retained package.");
+    if (!response.ok || data.offset !== end) throw new Error("Upload paused. Your capture is kept in this browser. Press Upload now to resume.");
     offset = end;
     progress(Math.round(offset / capture.blob.size * 100));
   }
   const response = await authFetch(`${path}/complete`, { method: "POST" }, false, capture.account);
   const data = await response.json();
   if (response.status === 409 && data.error === "SESSION_NOT_OPEN") return { status: 202, json: { jobId: state.jobId } };
-  if (!response.ok) throw new Error(data.message || "Completion could not be confirmed. Check History before starting another capture.");
+  if (!response.ok) throw new Error(data.message || "We couldn't confirm it finished. Check History before saving again.");
   return { status: response.status, json: data };
 }

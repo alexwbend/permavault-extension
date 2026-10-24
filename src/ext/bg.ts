@@ -36,7 +36,7 @@ function main() {
 
   chrome.contextMenus.create({
     id: "toggle-rec",
-    title: "Archive this page",
+    title: "Save this page",
     contexts: ["browser_action"],
   });
   chrome.contextMenus.create({
@@ -46,7 +46,7 @@ function main() {
   });
   chrome.contextMenus.create({
     id: "open-vault",
-    title: "Open vault",
+    title: "Open Permavault",
     contexts: ["all"],
   });
 }

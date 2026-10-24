@@ -44,11 +44,11 @@ export async function makePermanent(uploadId: string): Promise<string> {
   });
   const data = await response.json();
   if (!response.ok || typeof data.url !== "string") {
-    throw new Error("Checkout is unavailable. Check History for this save and any payment already in progress.");
+    throw new Error("Checkout didn't open. Check History to continue.");
   }
   const url = new URL(data.url);
   if (url.protocol !== "https:" || url.hostname !== "checkout.stripe.com") {
-    throw new Error("Checkout could not be opened. Check History to continue.");
+    throw new Error("Checkout didn't open. Check History to continue.");
   }
   return url.href;
 }

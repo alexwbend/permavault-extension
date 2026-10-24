@@ -37,7 +37,7 @@ test('email authorization rejects a foreign approval origin', async () => {
     '../localstorage': { getLocalOption: async () => null, setLocalOption: async () => assert.fail('saved untrusted grant') },
     './auth': { getApiBase: async () => 'https://app.permavault.xyz/api', getAppOrigin: async () => 'https://app.permavault.xyz', beginAuthAttempt: async () => 'generation', assertAuthGeneration: async () => {} },
   }, { fetch: async () => ({ ok: true, json: async () => ({ id: 'g', userCode: 'ABCD1234', approvalUrl: 'https://evil.test/extension/approve', expiresAt: new Date(Date.now()+60000).toISOString() }) }) });
-  await assert.rejects(auth.startEmailGrant(), /could not be verified/);
+  await assert.rejects(auth.startEmailGrant(), /couldn't verify this sign-in/);
 });
 function large(fetch) {
   return moduleFor('largeCapture.ts', {
@@ -83,34 +83,27 @@ test('lost chunk reply preserves same session and reads authoritative offset on 
 test('large checkout reuses operation identity and validates redirect', async () => {
   let body;
   const api = large(async (_url, opts) => { body = JSON.parse(opts.body); return response(200, { url: 'https://evil.test', orderId: 'o', sessionId: 's', quote: { amountCents: 999 } }); });
-  await assert.rejects(api.checkoutLargeCapture(200000000, { checkoutOperationId: 'stable-payment-op' }), /could not be verified/);
+  await assert.rejects(api.checkoutLargeCapture(200000000, { checkoutOperationId: 'stable-payment-op' }), /Checkout didn't open/);
   assert.equal(body.operationId, 'stable-payment-op');
   assert.equal(body.fileSize, 200000000);
 });
-test('PV-475: the quote carries the server line and the checkout sends back the version shown', async () => {
-  const ack = { version: 'large-v', text: 'Your 14-day right to cancel ends once it is stored.' };
+test('PV-575 row 3: no line above the payment, and the checkout acknowledges nothing', async () => {
   const bodies = [];
   const api = large(async (url, opts) => {
     bodies.push({ url, body: JSON.parse(opts.body) });
-    if (url.endsWith('/estimate')) return response(200, { estimate: { pricing: 'dynamic', quote: { amountCents: 1234 }, withdrawalAck: ack } });
+    // An older server may still send a line: it is not shown and never acknowledged.
+    if (url.endsWith('/estimate')) return response(200, { estimate: { pricing: 'dynamic', quote: { amountCents: 1234 }, withdrawalAck: { version: 'old', text: 'old line' } } });
     return response(200, { url: 'https://checkout.stripe.com/c/pay', orderId: 'o', sessionId: 's', quote: { amountCents: 1234 } });
   });
   const quote = await api.quoteLargeCapture(200000000, 'account');
   assert.equal(quote.amountCents, 1234);
   assert.equal(quote.included, false);
-  assert.equal(quote.withdrawalAck.version, 'large-v');
-  assert.equal(quote.withdrawalAck.text, ack.text);
-  await api.checkoutLargeCapture(200000000, { checkoutOperationId: 'op' }, quote.withdrawalAck.version);
-  const checkout = bodies.filter((b) => b.url.endsWith('/payments/large-media')).at(-1).body;
-  assert.equal(checkout.acknowledgedWithdrawal, true);
-  assert.equal(checkout.withdrawalAckVersion, 'large-v');
-  // Without a line shown, nothing is acknowledged on the customer's behalf.
+  assert.equal('withdrawalAck' in quote, false);
   await api.checkoutLargeCapture(200000000, { checkoutOperationId: 'op' });
   const bare = bodies.filter((b) => b.url.endsWith('/payments/large-media')).at(-1).body;
   assert.equal('acknowledgedWithdrawal' in bare, false);
   assert.equal('withdrawalAckVersion' in bare, false);
 });
-
 test("PV-536: only this package's own earlier payment (the same size) is found, and a named one is used", async () => {
   const api = large(async (url) => {
     if (url.endsWith('/large-media/pending')) return response(200, { orders: [
@@ -144,7 +137,7 @@ test('bound API request refuses another account before sending any bytes', async
   const api = moduleFor('auth.ts', { '../localstorage': {
     getLocalOption: async key => values.get(key), setLocalOption: async (key, value) => values.set(key, value), removeLocalOption: async key => values.delete(key),
   } }, { Headers, fetch: async () => assert.fail('cross-account request sent') });
-  await assert.rejects(api.authFetch('/archive/file', {}, false, 'capture-owner'), /account changed/);
+  await assert.rejects(api.authFetch('/archive/file', {}, false, 'capture-owner'), /switched accounts/);
 });
 
 test('email sign-in removes previous key-file fallback', async () => {
@@ -162,7 +155,7 @@ test('a late rotation reply does not revive a signed-out account', async () => {
   const api = moduleFor('auth.ts', { '../localstorage': {
     getLocalOption: async key => values.get(key), setLocalOption: async (key, value) => values.set(key, value), removeLocalOption: async key => values.delete(key),
   } }, { Headers, fetch: async () => { await api.signOut(); return { status: 200, headers: { get: () => 'rotated-token' } }; } });
-  await assert.rejects(api.authFetch('/payments/balance', {}, false, 'account'), /Sign-in changed/);
+  await assert.rejects(api.authFetch('/payments/balance', {}, false, 'account'), /sign-in changed/i);
   assert.equal(values.has('pvToken'), false);
 });
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
@@ -181,7 +174,7 @@ test('paid checkout replay accepts only the exact trusted session return', async
   assert.equal(recovered.orderId, 'order');
   assert.equal(recovered.checkoutSessionId, 'session');
   for (const url of ['https://app.permavault.xyz/purchase/success?session_id=other', 'https://evil.test/purchase/success?session_id=session', 'https://app.permavault.xyz/purchase/success?session_id=session&next=evil']) {
-    await assert.rejects(make(url).checkoutLargeCapture(200000000, state), /could not be verified/);
+    await assert.rejects(make(url).checkoutLargeCapture(200000000, state), /Checkout didn't open/);
   }
 });
 test('pending JWK login cannot revive account after sign-out', async () => {
@@ -194,7 +187,7 @@ test('pending JWK login cannot revive account after sign-out', async () => {
   });
   const login = api.signInWithJwk({ kty: 'RSA' });
   await entered.promise; await api.signOut(); gate.resolve();
-  await assert.rejects(login, /Sign-in changed/);
+  await assert.rejects(login, /sign-in changed/i);
   assert.equal(await api.getStoredSession(), null);
   assert.equal(revoked.length, 1);
 });
@@ -209,7 +202,7 @@ test('pending renewal cannot replace a newer email account', async () => {
   values.set('pvToken', jwt('old')); values.set('pvWallet', 'old'); values.set('pvJwk', JSON.stringify({ kty: 'RSA' }));
   const request = api.authFetch('/payments/balance');
   await entered.promise; await api.acceptEmailSession(jwt('email'), 'email'); gate.resolve();
-  await assert.rejects(request, /Sign-in changed/);
+  await assert.rejects(request, /sign-in changed/i);
   assert.equal((await api.getStoredSession()).walletAddress, 'email');
   assert.equal((await api.getStoredSession()).jwk, undefined);
 });
@@ -219,7 +212,7 @@ test('response body arriving after account switch cannot advance old operation',
   await api.acceptEmailSession(jwt('old'), 'old');
   const res = await api.authFetch('/payments/balance'); const body = res.json();
   await api.acceptEmailSession(jwt('new'), 'new'); gate.resolve({ balance: 10 });
-  await assert.rejects(body, /Sign-in changed/);
+  await assert.rejects(body, /sign-in changed/i);
 });
 test('sign-out clears locally before its best-effort remote revocation completes', async () => {
   const gate = deferred(); let request;

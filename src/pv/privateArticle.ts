@@ -1,6 +1,8 @@
 import { Encrypter } from "age-encryption";
 import { authFetch } from "./auth";
 
+/** Shown when the account has no checked Private Vault yet; the popup then offers setup. */
+export const VAULT_SETUP_MESSAGE = "Finish setting up your Private Vault to save privately.";
 export const ARTICLE_BYTES = 10 * 1024 * 1024;
 const RECIPIENT = /^age1[02-9ac-hj-np-z]{50,120}$/u;
 
@@ -42,25 +44,25 @@ function encrypt(recipient: string, bytes: Uint8Array): Promise<Uint8Array> {
 export async function getPrivateVault(account?: string): Promise<PrivateVault> {
   const response = await authFetch("/vault/recipient", {}, false, account);
   if (!response.ok) {
-    if (response.status === 404 || response.status === 409) throw new Error("Set up and check your Private Vault on the Permavault website first.");
-    throw new Error("Your Private Vault is unavailable. Try again later.");
+    if (response.status === 404 || response.status === 409) throw new Error(VAULT_SETUP_MESSAGE);
+    throw new Error("Can't reach your Private Vault right now. Nothing was sent. Try again soon.");
   }
   const data = await response.json();
   const vault = data?.vault;
   if (!vault || typeof vault.id !== "string" || !RECIPIENT.test(vault.recipient) || vault.formatVersion !== "age-v1") {
-    throw new Error("Your Private Vault could not be verified. No page was sent.");
+    throw new Error("We couldn't confirm your Private Vault, so nothing was sent.");
   }
   return vault;
 }
 
 /** Build the private-1.0 commitment used by the web app, then lock both WACZ and manifest. */
 export async function lockArticle(blob: Blob, vault: PrivateVault): Promise<LockedArticle> {
-  if (blob.size === 0 || blob.size > ARTICLE_BYTES) throw new Error("Private article saves go up to 10 MB. This package remains in your local library.");
-  if (!RECIPIENT.test(vault.recipient)) throw new Error("Your Private Vault is unavailable. No page was sent.");
+  if (blob.size === 0 || blob.size > ARTICLE_BYTES) throw new Error("Private saves go up to 10 MB. This page is in your local library.");
+  if (!RECIPIENT.test(vault.recipient)) throw new Error("Can't reach your Private Vault right now. Nothing was sent. Try again soon.");
   const plaintext = new Uint8Array(await blob.arrayBuffer());
   // WACZ is ZIP. This validates the extension's own packaging before we hide it.
   if (plaintext.length < 4 || plaintext[0] !== 0x50 || plaintext[1] !== 0x4b || plaintext[2] !== 0x03 || plaintext[3] !== 0x04) {
-    throw new Error("The package is not a valid WACZ. Nothing was sent.");
+    throw new Error("This capture couldn't be read, so nothing was sent. Save the page again.");
   }
   const plaintextSha256 = toHex(new Uint8Array(await crypto.subtle.digest("SHA-256", plaintext as BufferSource)));
   const nonce = crypto.getRandomValues(new Uint8Array(32));
@@ -98,7 +100,7 @@ export async function lockArticle(blob: Blob, vault: PrivateVault): Promise<Lock
 export async function stagePrivateArticle(article: LockedArticle, account: string): Promise<{ status: number; json: Record<string, unknown> | null }> {
   const current = await getPrivateVault(account);
   if (current.id !== article.vaultId || current.recipient !== article.recipient) {
-    throw new Error("Your Private Vault changed. This locked package cannot be sent. Capture the page again with the current vault.");
+    throw new Error("Your Private Vault changed, so this capture can't be sent. Save the page again.");
   }
   const form = new FormData();
   form.append("file", new File([article.blob], article.filename, { type: "application/octet-stream" }));

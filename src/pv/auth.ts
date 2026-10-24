@@ -3,7 +3,7 @@
 import { getLocalOption, setLocalOption, removeLocalOption } from "../localstorage";
 const DEFAULT_API_BASE = "https://app.permavault.xyz/api";
 export const VAULT_HOME = "https://app.permavault.xyz";
-export type PvSession = { token: string; expiresAt: number; walletAddress: string; generation?: string; jwk?: unknown };
+export type PvSession = { token: string; expiresAt: number; walletAddress: string; generation?: string; jwk?: unknown; email?: string };
 export async function getApiBase(): Promise<string> { return ((await getLocalOption("pvApiBase")) || DEFAULT_API_BASE).replace(/\/+$/, ""); }
 export async function getAppOrigin(): Promise<string> { return (await getApiBase()).replace(/\/api$/, ""); }
 export async function authGeneration(): Promise<string> { return (await getLocalOption("pvAuthGeneration")) || "legacy"; }
@@ -13,11 +13,20 @@ export async function beginAuthAttempt(): Promise<string> {
   return generation;
 }
 export async function assertAuthGeneration(generation: string): Promise<void> {
-  if (await authGeneration() !== generation) throw new Error("Sign-in changed. Start again with the current account.");
+  if (await authGeneration() !== generation) throw new Error("Your sign-in changed. Sign in again.");
 }
 function jwtPayload(token: string): Record<string, unknown> {
-  try { return JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))); }
+  try {
+    const binary = atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"));
+    // The payload is UTF-8, so a name or email with accents reads correctly.
+    return JSON.parse(new TextDecoder().decode(Uint8Array.from(binary, (c) => c.charCodeAt(0))));
+  }
   catch { return {}; }
+}
+/** The account email the popup shows, read from the session token (email sign-in only). */
+function withEmail(session: PvSession): PvSession {
+  const email = jwtPayload(session.token).email;
+  return typeof email === "string" && email.includes("@") ? { ...session, email } : session;
 }
 export async function getStoredSession(): Promise<PvSession | null> {
   const generation = await authGeneration();
@@ -25,7 +34,7 @@ export async function getStoredSession(): Promise<PvSession | null> {
   if (saved) {
     try {
       const session = JSON.parse(saved) as PvSession;
-      if (session.generation === generation && session.token && session.walletAddress && await authGeneration() === generation) return session;
+      if (session.generation === generation && session.token && session.walletAddress && await authGeneration() === generation) return withEmail(session);
     } catch { /* invalid session is never used */ }
   }
   // Read old installs only until the first generation-aware transition.
@@ -34,8 +43,8 @@ export async function getStoredSession(): Promise<PvSession | null> {
   const walletAddress = await getLocalOption("pvWallet");
   const jwk = await getLocalOption("pvJwk");
   if (!token || !walletAddress || await authGeneration() !== generation) return null;
-  return { token, walletAddress, expiresAt: Number(await getLocalOption("pvExpiresAt")) || 0,
-    generation, ...(jwk ? { jwk: JSON.parse(jwk) } : {}) };
+  return withEmail({ token, walletAddress, expiresAt: Number(await getLocalOption("pvExpiresAt")) || 0,
+    generation, ...(jwk ? { jwk: JSON.parse(jwk) } : {}) });
 }
 async function storeSession(session: PvSession, generation: string): Promise<void> {
   await assertAuthGeneration(generation);
@@ -81,7 +90,7 @@ export async function signInWithJwk(jwk: unknown, expectedGeneration?: string): 
 export async function authFetch(path: string, init: RequestInit = {}, retried = false, expectedAccount?: string): Promise<Response> {
   const session = await getStoredSession();
   if (!session) throw new Error("not_signed_in");
-  if (expectedAccount && session.walletAddress !== expectedAccount) throw new Error("The signed-in account changed. Sign in to the account that owns this package.");
+  if (expectedAccount && session.walletAddress !== expectedAccount) throw new Error("You switched accounts. Sign in to the account that saved this capture.");
   const generation = session.generation || "legacy";
   const base = await getApiBase();
   const headers = new Headers(init.headers || {}); headers.set("Authorization", `Bearer ${session.token}`);
@@ -92,7 +101,7 @@ export async function authFetch(path: string, init: RequestInit = {}, retried = 
   if (rotated) await storeSession({ ...session, token: rotated, expiresAt: Number(jwtPayload(rotated).exp || 0) * 1000 }, generation);
   if (response.status === 401 && !retried && session.jwk) {
     const refreshed = await signInWithJwk(session.jwk, generation);
-    if (refreshed.walletAddress !== session.walletAddress) throw new Error("Renewal returned a different account.");
+    if (refreshed.walletAddress !== session.walletAddress) throw new Error("Your sign-in changed. Sign in again.");
     return authFetch(path, init, true, expectedAccount || session.walletAddress);
   }
   // Native API callers consume JSON asynchronously. Account changes while the
