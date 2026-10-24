@@ -4,11 +4,13 @@ Listing copy for the matching release. Check the exact extension package and web
 
 ## Name
 
-Permavault
+Permavault Archive: Save Web Pages
 
 ## Short description
 
-Capture pages before they change. Keep the page and its proof.
+Save web pages before they change. Pay once to keep the page and its capture record on permanent storage.
+
+The Store takes the name and short description from the package manifest (`name`, `description`), so these two lines change with the next package upload, not in the listing editor (decided 24 Oct 2026, PV-207).
 
 ## Detailed description
 
