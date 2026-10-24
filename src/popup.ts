@@ -2,7 +2,8 @@
 // current tab with the existing engine, package the WACZ and upload it to
 // the Permavault vault.
 
-import { LitElement, html, css, svg } from "lit";
+import { LitElement, html, css } from "lit";
+import { icon, type IconName } from "./icons";
 
 import {
   BEHAVIOR_WAIT_LOAD,
@@ -28,34 +29,6 @@ import { quoteLargeCapture, checkoutLargeCapture, coveringLargePayment, largeChe
 import { ARTICLE_BYTES, VAULT_SETUP_MESSAGE, getPrivateVault, lockArticle, stagePrivateArticle, type LockedArticle } from "./pv/privateArticle";
 import { getLocalOption, setLocalOption, removeLocalOption } from "./localstorage";
 
-// Lucide icons (lucide 0.460), inline so the popup loads nothing else. Their
-// stroke comes from the .ic styles (K5 Graphite, option I).
-const ICONS = {
-  alert: svg`<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path>`,
-  check: svg`<path d="M20 6 9 17l-5-5"></path>`,
-  chevron: svg`<path d="m9 18 6-6-6-6"></path>`,
-  clock: svg`<circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline>`,
-  download: svg`<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line>`,
-  external: svg`<path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>`,
-  folder: svg`<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path>`,
-  globe: svg`<circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><path d="M2 12h20"></path>`,
-  hourglass: svg`<path d="M5 22h14"></path><path d="M5 2h14"></path><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"></path><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"></path>`,
-  info: svg`<circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path>`,
-  key: svg`<path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4"></path><path d="m21 2-9.6 9.6"></path><circle cx="7.5" cy="15.5" r="5.5"></circle>`,
-  lock: svg`<rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>`,
-  mail: svg`<rect width="20" height="16" x="2" y="4" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path>`,
-  package: svg`<path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"></path><path d="M12 22V12"></path><path d="m3.3 7 7.703 4.734a2 2 0 0 0 1.994 0L20.7 7"></path><path d="m7.5 4.27 9 5.15"></path>`,
-  record: svg`<circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="1"></circle>`,
-  refresh: svg`<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path><path d="M8 16H3v5"></path>`,
-  upload: svg`<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" x2="12" y1="3" y2="15"></line>`,
-};
-
-type IconName = keyof typeof ICONS;
-
-function icon(name: IconName, size = 16, extra = "") {
-  const cls = `ic${size <= 14 ? " small" : ""}${extra ? ` ${extra}` : ""}`;
-  return html`<svg class="${cls}" width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`;
-}
 
 const STANDARD_BYTES = 100 * 1024 * 1024;
 
@@ -124,6 +97,7 @@ class PermavaultPopup extends LitElement {
   declare phase: string;
   declare destinationAccepted: boolean;
   declare privateSelected: boolean;
+  declare tip: { text: string; top: number; left: number; width: number; above: boolean; pinned: boolean } | null;
   declare privateVaultReady: boolean;
   declare privateVaultMessage: string;
   declare privateArticle: LockedArticle | null;
@@ -183,6 +157,7 @@ class PermavaultPopup extends LitElement {
     this.phase = "loading";
     this.destinationAccepted = false;
     this.privateSelected = false;
+    this.tip = null;
     this.privateVaultReady = false;
     this.privateVaultMessage = "";
     this.privateArticle = null;
@@ -243,6 +218,7 @@ class PermavaultPopup extends LitElement {
       stagedExpiresAt: { type: String },
       checkoutBusy: { type: Boolean },
       pendingAccount: { type: String },
+      tip: { type: Object },
       privateSelected: { type: Boolean }, privateVaultReady: { type: Boolean }, privateVaultMessage: { type: String },
       phase: { type: String },
 
@@ -1384,6 +1360,7 @@ class PermavaultPopup extends LitElement {
       }
 
       .app {
+        position: relative;
         display: flex;
         flex-direction: column;
         min-height: 200px;
@@ -1460,9 +1437,39 @@ class PermavaultPopup extends LitElement {
         cursor: help;
       }
 
+      button.info {
+        padding: 0;
+        background: transparent;
+      }
+
       .info:hover,
       .info:focus-visible {
         color: var(--pv-ink2);
+      }
+
+      .tip {
+        position: absolute;
+        z-index: 10;
+        max-width: 260px;
+        padding: 8px 10px;
+        border-radius: 9px;
+        background: #1d1d1f;
+        color: #fff;
+        font-size: 12.5px;
+        line-height: 17px;
+        font-weight: 400;
+        text-align: left;
+        box-shadow: 0 10px 24px -8px rgba(0, 0, 0, 0.45);
+        pointer-events: none;
+      }
+
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
       }
 
       main {
@@ -2029,9 +2036,16 @@ class PermavaultPopup extends LitElement {
 
       .balance-row {
         display: flex;
-        justify-content: flex-end;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
         padding-top: 12px;
         border-top: 0.5px solid var(--pv-line);
+      }
+
+      .balance-label {
+        font-size: 12.5px;
+        color: var(--pv-muted);
       }
 
       .balance {
@@ -2222,16 +2236,18 @@ class PermavaultPopup extends LitElement {
 
   render() {
     if (this.phase === "loading") {
-      return html``;
+      return html`<div class="sr-only" role="status" aria-live="polite">${this.liveMessage}</div>`;
     }
 
     return html`
-      <div class="app">
+      <div class="app" @keydown=${this.onTipKey}>
         ${this.renderHeader()}
         <main>
           ${this.renderMain()}
         </main>
         ${this.renderFooter()}
+        <div class="sr-only" role="status" aria-live="polite">${this.liveMessage}</div>
+        ${this.tip ? html`<div class="tip ${this.tip.above ? "above" : ""}" role="tooltip" style="top: ${this.tip.top}px; left: ${this.tip.left}px; width: ${this.tip.width}px">${this.tip.text}</div>` : ""}
       </div>
     `;
   }
@@ -2267,7 +2283,93 @@ class PermavaultPopup extends LitElement {
 
   /** A short detail behind an (i), so the screen itself stays short. */
   info(text: string) {
-    return html`<span class="info" role="img" tabindex="0" aria-label="${text}" title="${text}">${icon("info", 15)}</span>`;
+    return html`<button type="button" class="info" aria-label="${text}"
+      @mouseenter=${(e: Event) => this.showTip(e, text, false)} @mouseleave=${() => this.hideTip(false)}
+      @focus=${(e: Event) => this.showTip(e, text, false)} @blur=${() => this.hideTip(true)}
+      @click=${(e: Event) => this.showTip(e, text, !this.tip?.pinned)}>${icon("info", 15)}</button>`;
+  }
+
+  /** Shows an (i) tip below its icon, kept inside the popup's width. */
+  showTip(event: Event, text: string, pinned: boolean) {
+    const target = event.currentTarget as HTMLElement;
+    const app = this.renderRoot.querySelector<HTMLElement>(".app");
+    if (!target || !app) return;
+    if (event.type === "click" && this.tip?.text === text && this.tip.pinned) {
+      this.tip = null;
+      return;
+    }
+    const box = target.getBoundingClientRect();
+    const frame = app.getBoundingClientRect();
+    // About 6.5px per character at 12.5px, plus padding; never wider than 260px.
+    const width = Math.min(260, frame.width - 16, Math.ceil(text.length * 6.5) + 22);
+    const centre = box.left - frame.left + box.width / 2;
+    const left = Math.max(8, Math.min(frame.width - width - 8, centre - width / 2));
+    const lines = Math.ceil((text.length * 6.5) / (width - 20));
+    const height = lines * 17 + 16;
+    const above = box.bottom - frame.top + 6 + height > frame.height && box.top - frame.top - 6 - height >= 0;
+    const top = above ? box.top - frame.top - 6 - height : box.bottom - frame.top + 6;
+    this.tip = { text, top, left, width, above, pinned: pinned || Boolean(this.tip?.pinned && this.tip.text === text) };
+  }
+
+  hideTip(force: boolean) {
+    if (this.tip && (force || !this.tip.pinned)) this.tip = null;
+  }
+
+  onTipKey(event: KeyboardEvent) {
+    if (event.key === "Escape" && this.tip) {
+      // Chrome closes the popup on an Escape the page leaves unhandled.
+      this.tip = null;
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  }
+
+  willUpdate(changed: Map<string, unknown>) {
+    // A tip belongs to the screen it was opened on.
+    if (changed.has("phase") && this.tip) this.tip = null;
+  }
+
+  /** The status line plus any error, announced politely as they change. */
+  get liveMessage() {
+    return [this.liveStatus, this.errorMsg || this.keyError].filter(Boolean).join(". ");
+  }
+
+  /** What a screen reader hears as the popup moves between steps. */
+  get liveStatus() {
+    switch (this.phase) {
+      case "capturing":
+        // Step names only: the page's own progress messages change too often to read aloud.
+        return this.stopping || this.stopRequested ? "Finishing up…" : "Saving the page…";
+      case "review-capture":
+        return "Your capture is ready";
+      case "packaging":
+        return this.packagingLine;
+      case "uploading":
+        return this.uploadingLine;
+      case "done":
+        return this.doneTitle;
+      case "out-of-captures":
+        return "No captures left";
+      case "error":
+        return "We couldn't finish this";
+      default:
+        return "";
+    }
+  }
+
+  get packagingLine() {
+    return this.privateSelected ? "Sealing in your browser…" : "Preparing your capture…";
+  }
+
+  get uploadingLine() {
+    return this.uploadStage === "processing" ? "Finishing on Permavault…" : "Sending to Permavault…";
+  }
+
+  get doneTitle() {
+    if (this.doneKind === "staged") return this.privateSelected ? "Saved privately for 7 days" : "Saved free for 7 days";
+    if (this.doneKind === "existing") return "Already saved permanently";
+    if (this.doneKind === "vault") return "Sent to permanent storage";
+    return "Check History for the result";
   }
 
   /** The main action: its icon sits in a compartment of its own. */
@@ -2297,9 +2399,9 @@ class PermavaultPopup extends LitElement {
       case "packaging":
         return html`
           <section class="card">
-            <div class="status-block" role="status">
+            <div class="status-block">
               <span class="ring"><span class="spinner"></span></span>
-              <div class="status-text">${this.privateSelected ? "Sealing in your browser…" : "Preparing your capture…"}</div>
+              <div class="status-text">${this.packagingLine}</div>
             </div>
           </section>
         `;
@@ -2376,9 +2478,9 @@ class PermavaultPopup extends LitElement {
         ${large ? this.info("Over 100 MB, so it is priced by size. Closing the popup pauses the upload; reopen it to carry on.") : ""}
       </div>
       <div class="facts">
-        ${this.sourceUrl && !this.privateSelected ? html`<div class="fact"><span class="fact-label">Page:</span><span class="fact-value" title="${this.sourceUrl}">${this.sourceUrl}</span></div>` : ""}
-        <div class="fact"><span class="fact-label">Size:</span><span class="fact-value">${(size / 1024 / 1024).toFixed(2)} MB</span></div>
-        ${this.largeQuote !== null && !this.largeState?.paidEarlier ? html`<div class="fact"><span class="fact-label">Total:</span><strong class="fact-value">$${(this.largeQuote / 100).toFixed(2)}</strong></div>` : ""}
+        ${this.sourceUrl && !this.privateSelected ? html`<div class="fact"><span class="fact-label">Page</span><span class="fact-value" title="${this.sourceUrl}">${this.sourceUrl}</span></div>` : ""}
+        <div class="fact"><span class="fact-label">Size</span><span class="fact-value">${(size / 1024 / 1024).toFixed(2)} MB</span></div>
+        ${this.largeQuote !== null && !this.largeState?.paidEarlier ? html`<div class="fact"><span class="fact-label">Total</span><strong class="fact-value">$${(this.largeQuote / 100).toFixed(2)}</strong></div>` : ""}
       </div>
       ${line ? html`<p class="line"><span>${line}</span></p>` : ""}
       ${keepsUntilPaid ? html`<p class="line kept">${icon("check", 14)}Kept in this browser until you pay.</p>` : ""}
@@ -2474,7 +2576,7 @@ class PermavaultPopup extends LitElement {
   renderIdle() {
     return html`
       ${this.renderPageCard(this.balanceLine
-        ? html`<div class="balance-row"><span class="balance">${this.balanceLine}</span></div>`
+        ? html`<div class="balance-row"><span class="balance-label">Current page</span><span class="balance">${this.balanceLine}</span></div>`
         : "")}
       <label class="private-choice ${this.privateSelected ? "on" : ""}">
         <input type="checkbox" role="switch" .checked=${this.privateSelected}
@@ -2505,7 +2607,7 @@ class PermavaultPopup extends LitElement {
   renderCapturing() {
     return html`
       <section class="card">
-        <div class="status-block" role="status">
+        <div class="status-block">
           <span class="ring"><span class="spinner"></span></span>
           <div class="status-text">${this.captureStatusLine}</div>
           ${this.numPending > 0
@@ -2528,15 +2630,11 @@ class PermavaultPopup extends LitElement {
   renderUploading() {
     return html`
       <section class="card">
-        <div class="status-block" role="status">
+        <div class="status-block">
           ${this.uploadPercent === null
             ? html`<span class="ring"><span class="spinner"></span></span>`
             : this.heroTile("upload")}
-          <div class="status-text">
-            ${this.uploadStage === "processing"
-              ? "Finishing on Permavault…"
-              : "Sending to Permavault…"}
-          </div>
+          <div class="status-text">${this.uploadingLine}</div>
         </div>
         ${this.uploadPercent !== null
           ? html`
@@ -2565,7 +2663,7 @@ class PermavaultPopup extends LitElement {
         <section class="card">
           <div class="hero ${this.privateSelected ? "band" : ""}">
             ${this.heroTile(this.privateSelected ? "lock" : "clock", this.privateSelected ? "glass" : "temp")}
-            <div class="panel-title">${this.privateSelected ? "Saved privately for 7 days" : "Saved free for 7 days"}</div>
+            <div class="panel-title">${this.doneTitle}</div>
             <p class="panel-sub">
               <span>${expiry ? temporaryLine(expiry) : "Check History for when this save expires."}</span>
               ${tip}
@@ -2585,7 +2683,7 @@ class PermavaultPopup extends LitElement {
         <section class="card">
           <div class="hero">
             ${this.heroTile("check", "ok")}
-            <div class="panel-title">${this.doneKind === "existing" ? "Already saved permanently" : "Sent to permanent storage"}
+            <div class="panel-title">${this.doneTitle}
               ${this.info(this.privateSelected
                 ? "It stays sealed. Open it from History with your Private Vault."
                 : "Its link can take a few minutes to work. History shows storage and proof status.")}</div>
@@ -2602,7 +2700,7 @@ class PermavaultPopup extends LitElement {
       <section class="card">
         <div class="hero">
           ${this.heroTile("hourglass")}
-          <div class="panel-title">Check History for the result</div>
+          <div class="panel-title">${this.doneTitle}</div>
           <p class="panel-sub">
             <span>We could not confirm it here.</span> ${this.info("History shows whether it finished, any 7-day deadline, and its proof.")}
           </p>
