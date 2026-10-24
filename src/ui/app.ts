@@ -1113,12 +1113,12 @@ class ArchiveWebApp extends ReplayWebApp {
                   Pages you send to Permavault are handled as the <a href="${VAULT_HOME}/privacy" target="_blank" rel="noopener">Privacy Policy</a> describes.</p>
 
                   <p class="is-size-7">An experimental option can share a saved item on the IPFS peer-to-peer network through a unique link.
-                  Once shared there, others may be able to access it. Nothing is shared this way unless you choose to, and a warning is shown first.</p>
+                  Once shared there, others may be able to access it. Nothing is shared this way unless you choose to, and a warning is shown first unless you turned it off.</p>
 
                   <h4>Open source</h4>
                   <p class="is-size-7">This extension is built on <a href="https://github.com/webrecorder/archiveweb.page" target="_blank" rel="noopener">ArchiveWeb.page</a>
                   by the <a href="https://webrecorder.net/" target="_blank" rel="noopener">Webrecorder Project</a>, released under the AGPL-3.0 license.
-                  Permavault's source code for it is at
+                  This extension is also released under the AGPL-3.0 license, and its source code is at
                   <a href="https://github.com/alexwbend/permavault-extension" target="_blank" rel="noopener">github.com/alexwbend/permavault-extension</a>.</p>
 
                   <h4>Disclaimer of Warranties</h4>

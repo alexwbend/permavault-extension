@@ -97,7 +97,7 @@ class PermavaultPopup extends LitElement {
   declare phase: string;
   declare destinationAccepted: boolean;
   declare privateSelected: boolean;
-  declare tip: { text: string; top: number; left: number; pinned: boolean } | null;
+  declare tip: { text: string; top: number; left: number; width: number; above: boolean; pinned: boolean } | null;
   declare privateVaultReady: boolean;
   declare privateVaultMessage: string;
   declare privateArticle: LockedArticle | null;
@@ -2236,7 +2236,7 @@ class PermavaultPopup extends LitElement {
 
   render() {
     if (this.phase === "loading") {
-      return html``;
+      return html`<div class="sr-only" role="status" aria-live="polite">${this.liveMessage}</div>`;
     }
 
     return html`
@@ -2246,9 +2246,8 @@ class PermavaultPopup extends LitElement {
           ${this.renderMain()}
         </main>
         ${this.renderFooter()}
-        <div class="sr-only" role="status" aria-live="polite">${this.liveStatus}</div>
-        <div class="sr-only" role="alert">${this.errorMsg || this.keyError}</div>
-        ${this.tip ? html`<div class="tip" role="tooltip" style="top: ${this.tip.top}px; left: ${this.tip.left}px">${this.tip.text}</div>` : ""}
+        <div class="sr-only" role="status" aria-live="polite">${this.liveMessage}</div>
+        ${this.tip ? html`<div class="tip ${this.tip.above ? "above" : ""}" role="tooltip" style="top: ${this.tip.top}px; left: ${this.tip.left}px; width: ${this.tip.width}px">${this.tip.text}</div>` : ""}
       </div>
     `;
   }
@@ -2301,10 +2300,15 @@ class PermavaultPopup extends LitElement {
     }
     const box = target.getBoundingClientRect();
     const frame = app.getBoundingClientRect();
-    const width = Math.min(260, frame.width - 16);
+    // About 6.5px per character at 12.5px, plus padding; never wider than 260px.
+    const width = Math.min(260, frame.width - 16, Math.ceil(text.length * 6.5) + 22);
     const centre = box.left - frame.left + box.width / 2;
     const left = Math.max(8, Math.min(frame.width - width - 8, centre - width / 2));
-    this.tip = { text, top: box.bottom - frame.top + 6, left, pinned: pinned || Boolean(this.tip?.pinned && this.tip.text === text) };
+    const lines = Math.ceil((text.length * 6.5) / (width - 20));
+    const height = lines * 17 + 16;
+    const above = box.bottom - frame.top + 6 + height > frame.height && box.top - frame.top - 6 - height >= 0;
+    const top = above ? box.top - frame.top - 6 - height : box.bottom - frame.top + 6;
+    this.tip = { text, top, left, width, above, pinned: pinned || Boolean(this.tip?.pinned && this.tip.text === text) };
   }
 
   hideTip(force: boolean) {
@@ -2313,16 +2317,31 @@ class PermavaultPopup extends LitElement {
 
   onTipKey(event: KeyboardEvent) {
     if (event.key === "Escape" && this.tip) {
+      // Chrome closes the popup on an Escape the page leaves unhandled.
       this.tip = null;
+      event.preventDefault();
       event.stopPropagation();
     }
+  }
+
+  willUpdate(changed: Map<string, unknown>) {
+    // A tip belongs to the screen it was opened on.
+    if (changed.has("phase") && this.tip) this.tip = null;
+  }
+
+  /** The status line plus any error, announced politely as they change. */
+  get liveMessage() {
+    return [this.liveStatus, this.errorMsg || this.keyError].filter(Boolean).join(". ");
   }
 
   /** What a screen reader hears as the popup moves between steps. */
   get liveStatus() {
     switch (this.phase) {
       case "capturing":
-        return this.captureStatusLine;
+        // Step names only: the page's own progress messages change too often to read aloud.
+        return this.stopping || this.stopRequested ? "Finishing up…" : "Saving the page…";
+      case "review-capture":
+        return "Your capture is ready";
       case "packaging":
         return this.packagingLine;
       case "uploading":

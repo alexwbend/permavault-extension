@@ -130,7 +130,7 @@ class WrRecCollInfo extends ItemInfo {
         color: inherit;
       }
 
-      .button-row .button {
+      .button-row .button.icon-only {
         width: 34px;
         padding: 0;
       }
@@ -210,7 +210,7 @@ class WrRecCollInfo extends ItemInfo {
 
     return html`
       <div class="columns">
-        <div class="column is-4">
+        <div class="column is-3">
           <p class="minihead">Name</p>
           <div class="name">
             <span class="tile" aria-hidden="true">${icon("globe", 15)}</span>
@@ -239,21 +239,21 @@ class WrRecCollInfo extends ItemInfo {
             <a
               href="${apiPrefix}/c/${this.item
                 ?.id}/dl?format=wacz&amp;pages=all"
-              class="button is-small"
+              class="button is-small icon-only"
               title="Download WACZ"
             >
               <span class="icon is-small">${icon("download", 15)}</span>
             </a>
             <button
               @click="${this.onShowImport}"
-              class="button is-small"
+              class="button is-small icon-only"
               title="Import File"
             >
               <span class="icon">${icon("upload", 15)}</span>
             </button>
             <button
               @click="${this.onShowStart}"
-              class="button is-small"
+              class="button is-small icon-only"
               title="Start Archiving"
             >
               <span class="icon">${icon("record", 15)}</span>
