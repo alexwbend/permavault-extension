@@ -75,7 +75,7 @@ test('private article refuses invalid, oversized and replaced-vault captures wit
     sent++;
     return response(202, {});
   });
-  await assert.rejects(api.lockArticle(new Blob([new Uint8Array([1,2,3,4])]), { id: 'vault-1', recipient, formatVersion: 'age-v1' }), /not a valid WACZ/);
+  await assert.rejects(api.lockArticle(new Blob([new Uint8Array([1,2,3,4])]), { id: 'vault-1', recipient, formatVersion: 'age-v1' }), /couldn't be read, so nothing was sent/);
   await assert.rejects(api.lockArticle(new Blob([new Uint8Array(api.ARTICLE_BYTES + 1)]), { id: 'vault-1', recipient, formatVersion: 'age-v1' }), /up to 10 MB/);
   await assert.rejects(api.stagePrivateArticle({ blob: new Blob(['age']), filename: 'private.age', vaultId: 'vault-1', recipient, plaintextSize: 4, sealedManifest: 'sealed', anchorSha256: 'a'.repeat(64), operationId: 'same-operation' }, 'owner'), /Vault changed/);
   assert.equal(sent, 0);
