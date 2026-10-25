@@ -255,17 +255,18 @@ class BrowserRecorder extends Recorder {
       // @ts-expect-error - TS2339 - Property 'behaviorState' does not exist on type 'BrowserRecorder'.
       if (this.behaviorState === BEHAVIOR_RUNNING) {
         title = "Saving this page…";
-        color = "#0096ff";
+        // Indigo, so the dot stays visible on the navy icon.
+        color = "#5651d8";
         text = " ";
         // @ts-expect-error - TS2339 - Property 'numPending' does not exist on type 'BrowserRecorder'.
       } else if (this.numPending === 0) {
         title = "Page saved, finishing up";
-        color = "#4d7c0f";
+        color = "#1f8a4c";
         text = "✓";
       } else {
         // @ts-expect-error - TS2339 - Property 'numPending' does not exist on type 'BrowserRecorder'.
         title = `Saving, ${this.numPending} ${this.numPending === 1 ? "item" : "items"} left`;
-        color = "#c5a802";
+        color = "#b45309";
         // @ts-expect-error - TS2339 - Property 'numPending' does not exist on type 'BrowserRecorder'.
         text = "" + this.numPending;
       }
@@ -273,11 +274,11 @@ class BrowserRecorder extends Recorder {
     } else if (this.failureMsg) {
       title = "This page can't be saved";
       text = "X";
-      color = "#d30808";
+      color = "#c2410c";
     } else {
       title = "Permavault";
       text = "";
-      color = "#4d7c0f";
+      color = "#5651d8";
     }
 
     chrome.action.setTitle({ title, tabId });

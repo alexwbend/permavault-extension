@@ -32,8 +32,8 @@ async function main() {
   await fs.writeFile(path.join(root, 'static/icon-48.png'), icon48);
   await fs.writeFile(path.join(root, 'static/icon.png'), icon128);
   await fs.writeFile(path.join(root, 'static/icon-dev.png'), iconDev);
-  await fs.writeFile(path.join(root, 'static/permavault-mark.svg'), mark.replace('fill="currentColor"', 'fill="#1D1D1F"'));
-  await fs.writeFile(path.join(root, 'static/permavault-logo.svg'), logo.replace('fill="currentColor"', 'fill="#1D1D1F"'));
+  await fs.writeFile(path.join(root, 'static/permavault-mark.svg'), mark.replace('fill="currentColor"', 'fill="#18181B"'));
+  await fs.writeFile(path.join(root, 'static/permavault-logo.svg'), logo.replace('fill="currentColor"', 'fill="#18181B"'));
   console.log('Generated toolbar, development and popup brand assets.');
 }
 

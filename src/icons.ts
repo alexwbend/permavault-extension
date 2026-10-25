@@ -1,7 +1,7 @@
 import { html, svg } from "lit";
 
 // Lucide icons (lucide 0.460), inline so the extension loads no icon font. Their
-// stroke comes from the .ic styles (K5 Graphite, option I).
+// stroke comes from the .ic styles (Carton: 1.6 stroke, round caps).
 const ICONS = {
   alert: svg`<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path>`,
   check: svg`<path d="M20 6 9 17l-5-5"></path>`,

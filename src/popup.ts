@@ -1316,43 +1316,35 @@ class PermavaultPopup extends LitElement {
   static get styles() {
     return css`
       :host {
-        --pv-ink: #1d1d1f;
-        --pv-ink2: #3a3a3c;
-        --pv-muted: #56565b;
-        --pv-icon-muted: #86868b;
-        --pv-accent: #48484a;
-        --pv-fill: rgba(118, 118, 128, 0.12);
-        --pv-fill2: rgba(118, 118, 128, 0.08);
-        --pv-line: rgba(0, 0, 0, 0.08);
-        --pv-ok: #28a745;
-        --pv-fail-bg: #fdecec;
-        --pv-fail-ink: #b42318;
-        --pv-card-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04), 0 18px 40px -22px rgba(0, 0, 0, 0.22);
-        --pv-dark-card: radial-gradient(90% 70% at 0% 0%, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0) 60%),
-          radial-gradient(120% 90% at 100% 100%, rgba(142, 142, 147, 0.35) 0%, rgba(0, 0, 0, 0) 70%),
-          linear-gradient(155deg, #2c2c2e 0%, #1c1c1e 100%);
+        /* Carton (PV-588): white page, zinc neutrals, indigo for regular actions, Night navy only for Private. */
+        --pv-ink: #18181b;
+        --pv-ink2: #3f3f46;
+        --pv-muted: #6b6b76;
+        --pv-icon-muted: #71717a;
+        --pv-accent: #5651d8;
+        --pv-accent-hi: #6460e0;
+        --pv-accent-ink: #4b45c6;
+        --pv-top: #fafafb;
+        --pv-line: #e9e9ee;
+        --pv-line2: #efeff3;
+        --pv-edge: #e4e4e9;
+        --pv-fill: #f2f2f5;
+        --pv-fill2: #f5f5f7;
+        --pv-hover: #f7f7f9;
+        --pv-ok: #1f8a4c;
+        --pv-temp: #d97706;
+        --pv-fail-bg: #fdede6;
+        --pv-fail-ink: #c2410c;
+        --pv-navy: #192259;
+        --pv-navy-fill: linear-gradient(180deg, #232d6f 0%, #131a48 100%);
 
         display: block;
-        font-family:
-          -apple-system,
-          BlinkMacSystemFont,
-          "SF Pro Text",
-          "Geist",
-          system-ui,
-          "Segoe UI",
-          Roboto,
-          "Helvetica Neue",
-          Arial,
-          sans-serif;
+        font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
         font-size: 14px;
         line-height: 1.45;
-        letter-spacing: -0.006em;
         color: var(--pv-ink);
         -webkit-font-smoothing: antialiased;
-        background:
-          radial-gradient(70% 55% at 100% 0%, rgba(199, 201, 209, 0.55) 0%, rgba(199, 201, 209, 0) 70%),
-          radial-gradient(60% 50% at 0% 0%, rgba(218, 219, 224, 0.45) 0%, rgba(218, 219, 224, 0) 70%),
-          linear-gradient(180deg, #e3e4e8 0%, #eff0f2 42%, #f5f5f7 100%);
+        background: #fff;
       }
 
       * {
@@ -1366,43 +1358,35 @@ class PermavaultPopup extends LitElement {
         min-height: 200px;
       }
 
-      /* Lucide icons, option I: hairline strokes with square ends. */
+      /* Lucide line icons: 1.6 stroke, round caps and joins, never filled. */
       .ic {
         flex: none;
         fill: none;
         stroke: currentColor;
-        stroke-width: 1.5;
-        stroke-linecap: square;
-        stroke-linejoin: miter;
-      }
-
-      .ic.small {
-        stroke-width: 1.75;
+        stroke-width: 1.6;
+        stroke-linecap: round;
+        stroke-linejoin: round;
       }
 
       .ic.solid {
-        fill: currentColor;
+        fill: none;
       }
 
       header {
-        margin: 8px 8px 0;
-        height: 50px;
+        height: 52px;
         flex: none;
-        padding: 0 8px 0 12px;
+        padding: 0 10px 0 16px;
         display: flex;
         align-items: center;
         gap: 8px;
-        border-radius: 14px;
-        background: rgba(255, 255, 255, 0.72);
-        backdrop-filter: blur(40px) saturate(1.8);
-        box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.09), inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 10px 24px -16px rgba(0, 0, 0, 0.3);
+        background: var(--pv-top);
+        box-shadow: inset 0 -1px 0 var(--pv-line);
       }
 
       .brand {
         display: block;
         height: 22px;
         width: auto;
-        margin: 0 -3px;
         flex: none;
       }
 
@@ -1432,7 +1416,7 @@ class PermavaultPopup extends LitElement {
         height: 24px;
         flex: none;
         vertical-align: middle;
-        border-radius: 50%;
+        border-radius: 6px;
         color: var(--pv-icon-muted);
         cursor: help;
       }
@@ -1452,14 +1436,14 @@ class PermavaultPopup extends LitElement {
         z-index: 10;
         max-width: 260px;
         padding: 8px 10px;
-        border-radius: 9px;
-        background: #1d1d1f;
+        border-radius: 8px;
+        background: var(--pv-ink);
         color: #fff;
         font-size: 12.5px;
         line-height: 17px;
         font-weight: 400;
         text-align: left;
-        box-shadow: 0 10px 24px -8px rgba(0, 0, 0, 0.45);
+        box-shadow: 0 8px 20px -8px rgba(24, 24, 27, 0.4);
         pointer-events: none;
       }
 
@@ -1475,7 +1459,7 @@ class PermavaultPopup extends LitElement {
       main {
         flex: 1;
         min-height: 0;
-        padding: 10px 10px 0;
+        padding: 12px 12px 0;
         display: flex;
         flex-direction: column;
         gap: 10px;
@@ -1483,14 +1467,15 @@ class PermavaultPopup extends LitElement {
 
       footer {
         flex: none;
-        padding: 10px;
+        margin-top: 12px;
+        padding: 10px 12px;
         display: flex;
         gap: 8px;
+        box-shadow: inset 0 1px 0 var(--pv-line);
       }
 
       button {
         font: inherit;
-        letter-spacing: -0.008em;
         cursor: pointer;
         border: 0;
       }
@@ -1509,80 +1494,76 @@ class PermavaultPopup extends LitElement {
         outline-offset: 2px;
       }
 
-      .band .info:focus-visible,
-      .primary:focus-visible,
+      .primary.dark:focus-visible,
       .private-choice.on:has(input:focus-visible) {
-        outline-color: #fff;
-        box-shadow: 0 0 0 4px var(--pv-accent);
+        outline-color: var(--pv-navy);
       }
 
+      /* Flat solid buttons with 8px corners; the icon sits beside the label. */
       .primary,
       .secondary,
       .tint {
         width: 100%;
         height: 44px;
-        padding: 0 20px;
+        padding: 0 18px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         gap: 8px;
-        border-radius: 9px;
+        border-radius: 8px;
         font-size: 14.5px;
-        font-weight: 560;
+        font-weight: 500;
         white-space: nowrap;
         text-decoration: none;
       }
 
       .primary {
         color: #fff;
-        background: linear-gradient(180deg, #333336 0%, #1d1d1f 60%, #18181a 100%);
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 0 0 0.5px #000, 0 1px 3px -1px rgba(0, 0, 0, 0.25);
-      }
-
-      .primary.dark {
-        background:
-          radial-gradient(90% 140% at 0% 0%, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0) 60%),
-          linear-gradient(180deg, #303033 0%, #161618 100%);
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 0 0 0.5px #000, 0 4px 10px -6px rgba(0, 0, 0, 0.4);
+        background: var(--pv-accent);
       }
 
       .primary:not(:disabled):hover {
-        background: linear-gradient(180deg, #3a3a3d 0%, #262628 60%, #1d1d1f 100%);
+        background: var(--pv-accent-hi);
       }
 
-      /* The icon sits in its own compartment behind a hairline. */
+      /* Night navy: Private actions only. */
+      .primary.dark,
+      .primary.dark:not(:disabled):hover {
+        background: var(--pv-navy-fill);
+      }
+
       .primary .lead {
-        width: 44px;
-        height: 44px;
-        margin-left: -20px;
+        display: inline-flex;
         flex: none;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.2);
       }
 
       .secondary {
         color: var(--pv-ink);
-        background: linear-gradient(180deg, #fff 0%, #f8f8f9 100%);
-        box-shadow: inset 0 0 0 1px rgba(29, 29, 31, 0.28), 0 1px 1px rgba(0, 0, 0, 0.04);
+        background: #fff;
+        box-shadow: 0 0 0 1px var(--pv-edge);
       }
 
-      .secondary:not(:disabled):hover,
-      .tint:not(:disabled):hover {
-        background: #f1f1f3;
+      .secondary:not(:disabled):hover {
+        background: var(--pv-hover);
       }
 
       .tint {
         color: var(--pv-ink);
-        background: linear-gradient(180deg, #f4f4f6 0%, #ededf0 100%);
-        box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+        background: var(--pv-fill2);
+      }
+
+      .tint:not(:disabled):hover {
+        background: var(--pv-fill);
+      }
+
+      .tint .ic,
+      .secondary .ic {
+        color: var(--pv-ink2);
       }
 
       .tint.medium {
         height: 36px;
         padding: 0 12px;
-        border-radius: 7px;
         font-size: 13.5px;
       }
 
@@ -1593,7 +1574,6 @@ class PermavaultPopup extends LitElement {
         flex: none;
         border-radius: 6px;
         font-size: 13px;
-        font-weight: 510;
       }
 
       .stack {
@@ -1607,25 +1587,25 @@ class PermavaultPopup extends LitElement {
         display: flex;
         flex-direction: column;
         gap: 14px;
-        border-radius: 16px;
-        background: rgba(255, 255, 255, 0.92);
-        box-shadow: var(--pv-card-shadow);
+        border-radius: 10px;
+        background: #fff;
+        box-shadow: 0 0 0 1px var(--pv-line);
       }
 
       .card.tight {
-        padding: 12px 16px;
+        padding: 12px 14px;
       }
 
       .tile {
         width: 36px;
         height: 36px;
         flex: none;
-        border-radius: 10px;
+        border-radius: 8px;
         display: flex;
         align-items: center;
         justify-content: center;
-        background: rgba(72, 72, 74, 0.1);
-        color: var(--pv-accent);
+        background: var(--pv-fill2);
+        color: var(--pv-ink2);
       }
 
       .hero {
@@ -1637,47 +1617,39 @@ class PermavaultPopup extends LitElement {
         text-align: center;
       }
 
+      /* A coloured hero tile: indigo by default, navy when private, status colours for results. */
       .hero-tile {
-        width: 48px;
-        height: 48px;
+        width: 44px;
+        height: 44px;
         flex: none;
         border-radius: 10px;
         display: flex;
         align-items: center;
         justify-content: center;
-        color: var(--pv-ink);
-        background: linear-gradient(180deg, #fff 0%, #f2f2f5 100%);
-        box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.1), inset 0 1px 0 #fff, 0 8px 18px -10px rgba(0, 0, 0, 0.3);
+        color: #fff;
+        background: var(--pv-accent);
       }
 
       .hero-tile.small {
         width: 40px;
         height: 40px;
-        border-radius: 7px;
+        border-radius: 8px;
       }
 
       .hero-tile.ok {
-        color: #fff;
-        background: linear-gradient(180deg, #34c759 0%, #248a3d 100%);
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 10px 22px -10px rgba(36, 138, 61, 0.55);
+        background: var(--pv-ok);
       }
 
       .hero-tile.temp {
-        color: var(--pv-ink);
-        background: linear-gradient(180deg, #ffc23d 0%, #e6a100 100%);
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 10px 22px -10px rgba(230, 161, 0, 0.55);
+        background: var(--pv-temp);
       }
 
       .hero-tile.fail {
-        color: #fff;
-        background: linear-gradient(180deg, #e5484d 0%, #b42318 100%);
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 10px 22px -10px rgba(180, 35, 24, 0.5);
+        background: var(--pv-fail-ink);
       }
 
       .hero-tile.glass {
-        color: #fff;
-        background: rgba(255, 255, 255, 0.16);
-        box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+        background: var(--pv-navy-fill);
       }
 
       .panel-title {
@@ -1686,11 +1658,10 @@ class PermavaultPopup extends LitElement {
         align-items: center;
         justify-content: center;
         gap: 2px;
-        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Geist", system-ui, sans-serif;
         font-size: 18px;
-        line-height: 23px;
-        font-weight: 700;
-        letter-spacing: -0.02em;
+        line-height: 24px;
+        font-weight: 600;
+        letter-spacing: -0.005em;
       }
 
       .panel-sub {
@@ -1705,21 +1676,9 @@ class PermavaultPopup extends LitElement {
         overflow-wrap: anywhere;
       }
 
-      /* A dark band across the top of a card, for a private result. */
+      /* A private result: the card stays white and the hero tile turns navy. */
       .band {
-        margin: -16px -16px 0;
-        padding: 22px 16px 18px;
-        border-radius: 16px 16px 0 0;
-        background: var(--pv-dark-card);
-        color: #fff;
-      }
-
-      .band .panel-sub {
-        color: rgba(255, 255, 255, 0.86);
-      }
-
-      .band .info {
-        color: rgba(255, 255, 255, 0.8);
+        color: inherit;
       }
 
       .review-head {
@@ -1739,6 +1698,9 @@ class PermavaultPopup extends LitElement {
       .facts {
         display: flex;
         flex-direction: column;
+        overflow: hidden;
+        border-radius: 8px;
+        box-shadow: 0 0 0 1px var(--pv-line);
       }
 
       .fact {
@@ -1746,11 +1708,11 @@ class PermavaultPopup extends LitElement {
         justify-content: space-between;
         align-items: baseline;
         gap: 12px;
-        padding: 8px 0;
+        padding: 9px 12px;
       }
 
       .fact + .fact {
-        border-top: 0.5px solid var(--pv-line);
+        box-shadow: inset 0 1px 0 var(--pv-line);
       }
 
       .fact-label {
@@ -1766,6 +1728,11 @@ class PermavaultPopup extends LitElement {
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+      }
+
+      strong.fact-value {
+        font-weight: 600;
       }
 
       .line {
@@ -1785,21 +1752,19 @@ class PermavaultPopup extends LitElement {
       .line.kept .ic {
         margin-top: 1px;
         color: var(--pv-ok);
-        stroke-width: 2.4;
-        stroke-linecap: round;
-        stroke-linejoin: round;
+        stroke-width: 2;
       }
 
       .more {
         overflow: hidden;
-        border-radius: 14px;
-        background: rgba(255, 255, 255, 0.92);
-        box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+        border-radius: 10px;
+        background: #fff;
+        box-shadow: 0 0 0 1px var(--pv-line);
       }
 
       .more button {
         width: 100%;
-        min-height: 38px;
+        min-height: 40px;
         padding: 0 12px;
         display: flex;
         align-items: center;
@@ -1812,7 +1777,7 @@ class PermavaultPopup extends LitElement {
       }
 
       .more button + button {
-        box-shadow: inset 0 0.5px 0 rgba(0, 0, 0, 0.08);
+        box-shadow: inset 0 1px 0 var(--pv-line);
       }
 
       .more button:focus-visible {
@@ -1820,34 +1785,29 @@ class PermavaultPopup extends LitElement {
       }
 
       .more button:hover {
-        background: var(--pv-fill2);
+        background: var(--pv-hover);
       }
 
       .more .ic {
-        color: var(--pv-muted);
+        color: var(--pv-icon-muted);
       }
 
       .more .label {
         flex: 1;
       }
 
-      .more .chev {
-        color: var(--pv-icon-muted);
-      }
-
       .link {
         padding: 0;
         background: none;
-        color: var(--pv-ink2);
+        color: var(--pv-accent-ink);
         font-size: 12.5px;
         font-weight: 500;
-        text-decoration: underline;
-        text-decoration-color: rgba(0, 0, 0, 0.25);
-        text-underline-offset: 2px;
+        text-decoration: none;
       }
 
       .link:hover {
-        color: var(--pv-ink);
+        text-decoration: underline;
+        text-underline-offset: 2px;
       }
 
       .tagline {
@@ -1869,8 +1829,9 @@ class PermavaultPopup extends LitElement {
       }
 
       .code-box {
+        margin: 0;
         padding: 12px;
-        border-radius: 14px;
+        border-radius: 8px;
         background: var(--pv-fill2);
         font-size: 12.5px;
         line-height: 17px;
@@ -1887,19 +1848,19 @@ class PermavaultPopup extends LitElement {
       }
 
       details {
-        border-radius: 14px;
-        background: rgba(255, 255, 255, 0.6);
-        box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.08);
+        border-radius: 10px;
+        background: #fff;
+        box-shadow: 0 0 0 1px var(--pv-line);
       }
 
       summary {
         min-height: 40px;
-        padding: 0 14px;
+        padding: 0 12px 0 14px;
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 8px;
-        border-radius: 14px;
+        border-radius: 10px;
         list-style: none;
         cursor: pointer;
         font-size: 13px;
@@ -1917,12 +1878,12 @@ class PermavaultPopup extends LitElement {
         gap: 8px;
       }
 
-      summary .start .ic {
-        color: var(--pv-muted);
+      summary .start .ic,
+      summary .chev {
+        color: var(--pv-icon-muted);
       }
 
       summary .chev {
-        color: var(--pv-icon-muted);
         transition: transform 0.15s ease;
       }
 
@@ -1943,11 +1904,11 @@ class PermavaultPopup extends LitElement {
         align-items: center;
         justify-content: center;
         gap: 8px;
-        border-radius: 12px;
-        border: 1px dashed rgba(0, 0, 0, 0.22);
+        border-radius: 8px;
+        border: 1px dashed #c9c9d1;
         background: #fff;
         font-size: 13.5px;
-        font-weight: 600;
+        font-weight: 500;
         cursor: pointer;
       }
 
@@ -1978,7 +1939,7 @@ class PermavaultPopup extends LitElement {
       .or::after {
         content: "";
         flex: 1;
-        height: 0.5px;
+        height: 1px;
         background: var(--pv-line);
       }
 
@@ -1986,17 +1947,27 @@ class PermavaultPopup extends LitElement {
         width: 100%;
         padding: 10px 12px;
         border: 0;
-        border-radius: 12px;
-        background: var(--pv-fill2);
+        border-radius: 8px;
+        background: #fff;
+        box-shadow: 0 0 0 1px var(--pv-edge);
         font: 400 12px ui-monospace, SFMono-Regular, Menlo, monospace;
         color: var(--pv-ink);
         resize: vertical;
       }
 
+      textarea::placeholder {
+        color: var(--pv-icon-muted);
+      }
+
+      textarea:focus {
+        outline: 0;
+        box-shadow: 0 0 0 1.5px var(--pv-accent);
+      }
+
       .error-text {
         margin: 0;
-        padding: 11px 13px;
-        border-radius: 12px;
+        padding: 10px 12px;
+        border-radius: 8px;
         background: var(--pv-fail-bg);
         font-size: 13px;
         line-height: 18px;
@@ -2009,6 +1980,11 @@ class PermavaultPopup extends LitElement {
         align-items: center;
         gap: 12px;
         min-width: 0;
+      }
+
+      .page-card .tile {
+        background: rgba(86, 81, 216, 0.1);
+        color: var(--pv-accent);
       }
 
       .page-text {
@@ -2040,7 +2016,7 @@ class PermavaultPopup extends LitElement {
         justify-content: space-between;
         gap: 8px;
         padding-top: 12px;
-        border-top: 0.5px solid var(--pv-line);
+        box-shadow: inset 0 1px 0 var(--pv-line);
       }
 
       .balance-label {
@@ -2048,16 +2024,11 @@ class PermavaultPopup extends LitElement {
         color: var(--pv-muted);
       }
 
+      /* Quiet text, never a capsule. */
       .balance {
-        height: 26px;
-        padding: 0 11px;
-        display: inline-flex;
-        align-items: center;
-        border-radius: 999px;
-        background: linear-gradient(180deg, #fff 0%, #f6f6f8 100%);
-        box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.13), 0 1px 2px rgba(0, 0, 0, 0.06), inset 0 1px 0 #fff;
-        font-size: 12.5px;
-        font-weight: 600;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--pv-ink2);
         white-space: nowrap;
         font-variant-numeric: tabular-nums;
       }
@@ -2068,16 +2039,16 @@ class PermavaultPopup extends LitElement {
         align-items: center;
         gap: 12px;
         padding: 12px 14px 12px 12px;
-        border-radius: 16px;
-        background: rgba(255, 255, 255, 0.92);
-        box-shadow: var(--pv-card-shadow);
+        border-radius: 10px;
+        background: #fff;
+        box-shadow: 0 0 0 1px var(--pv-line);
         cursor: pointer;
       }
 
       .private-choice.on {
-        background: var(--pv-dark-card);
+        background: var(--pv-navy-fill);
         color: #fff;
-        box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 12px 26px -12px rgba(0, 0, 0, 0.5);
+        box-shadow: none;
       }
 
       .private-choice input {
@@ -2089,13 +2060,12 @@ class PermavaultPopup extends LitElement {
 
       .private-choice .tile {
         background: var(--pv-fill2);
-        color: var(--pv-ink2);
+        color: var(--pv-navy);
       }
 
       .private-choice.on .tile {
-        background: rgba(255, 255, 255, 0.16);
+        background: rgba(255, 255, 255, 0.14);
         color: #fff;
-        box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3);
       }
 
       .private-text {
@@ -2122,24 +2092,24 @@ class PermavaultPopup extends LitElement {
       }
 
       .switch {
-        width: 42px;
-        height: 26px;
+        width: 40px;
+        height: 24px;
         flex: none;
         padding: 2px;
         display: flex;
         justify-content: flex-start;
         border-radius: 999px;
-        background: #8e8e93;
+        background: #8e8e96;
         transition: background 0.15s ease;
       }
 
       .switch::after {
         content: "";
-        width: 22px;
-        height: 22px;
+        width: 20px;
+        height: 20px;
         border-radius: 50%;
         background: #fff;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+        box-shadow: 0 1px 2px rgba(24, 24, 27, 0.2);
       }
 
       .private-choice.on .switch {
@@ -2148,7 +2118,7 @@ class PermavaultPopup extends LitElement {
       }
 
       .private-choice.on .switch::after {
-        background: #1c1c1e;
+        background: var(--pv-navy);
         box-shadow: none;
       }
 
@@ -2181,21 +2151,20 @@ class PermavaultPopup extends LitElement {
       }
 
       .ring {
-        width: 56px;
-        height: 56px;
-        border-radius: 50%;
+        width: 48px;
+        height: 48px;
+        border-radius: 10px;
         display: flex;
         align-items: center;
         justify-content: center;
-        background: #fff;
-        box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.08), 0 10px 22px -12px rgba(0, 0, 0, 0.35);
+        background: var(--pv-fill2);
       }
 
       .spinner {
         width: 22px;
         height: 22px;
         border-radius: 50%;
-        border: 2.6px solid var(--pv-fill);
+        border: 2.5px solid var(--pv-edge);
         border-top-color: var(--pv-accent);
         animation: pv-spin 0.9s linear infinite;
       }
@@ -2223,10 +2192,12 @@ class PermavaultPopup extends LitElement {
       .progress-fill {
         height: 100%;
         border-radius: 999px;
-        background:
-          linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0) 60%),
-          linear-gradient(90deg, #a1a1a6 0%, #636366 55%, #3a3a3c 100%);
+        background: var(--pv-accent);
         transition: width 0.3s ease;
+      }
+
+      .progress.private .progress-fill {
+        background: var(--pv-navy);
       }
     `;
   }
@@ -2276,7 +2247,7 @@ class PermavaultPopup extends LitElement {
     return html`
       <footer>
         <button class="tint medium" @click=${this.onOpenVault}>${icon("external", 16)}Open Permavault</button>
-        <button class="tint medium" @click=${this.onOpenLibrary}>${icon("folder", 16, "solid")}Local library</button>
+        <button class="tint medium" @click=${this.onOpenLibrary}>${icon("folder", 16)}Local library</button>
       </footer>
     `;
   }
@@ -2372,7 +2343,7 @@ class PermavaultPopup extends LitElement {
     return "Check History for the result";
   }
 
-  /** The main action: its icon sits in a compartment of its own. */
+  /** The main action's icon, beside its label. */
   lead(name: IconName) {
     return html`<span class="lead">${icon(name, 18)}</span>`;
   }
@@ -2638,7 +2609,7 @@ class PermavaultPopup extends LitElement {
         </div>
         ${this.uploadPercent !== null
           ? html`
-              <div class="progress" role="progressbar" aria-label="Upload progress" aria-valuenow="${this.uploadPercent}" aria-valuemin="0" aria-valuemax="100">
+              <div class="progress ${this.privateSelected ? "private" : ""}" role="progressbar" aria-label="Upload progress" aria-valuenow="${this.uploadPercent}" aria-valuemin="0" aria-valuemax="100">
                 <div
                   class="progress-fill"
                   style="width: ${this.uploadPercent}%"

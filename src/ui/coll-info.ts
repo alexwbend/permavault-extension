@@ -90,12 +90,12 @@ class WrRecCollInfo extends ItemInfo {
         margin-bottom: 4px;
         font-size: 11.5px;
         font-weight: 600;
-        color: var(--pv-muted, #56565b);
+        color: var(--pv-muted, #6b6b76);
       }
 
       .column {
         font-size: 13.5px;
-        color: var(--pv-ink2, #3a3a3c);
+        color: var(--pv-ink2, #3f3f46);
         font-variant-numeric: tabular-nums;
       }
 
@@ -113,9 +113,9 @@ class WrRecCollInfo extends ItemInfo {
         display: flex;
         align-items: center;
         justify-content: center;
-        border-radius: 9px;
-        background: rgba(72, 72, 74, 0.1);
-        color: #48484a;
+        border-radius: 8px;
+        background: rgba(86, 81, 216, 0.1);
+        color: #5651d8;
       }
 
       .name .subtitle {
@@ -123,7 +123,7 @@ class WrRecCollInfo extends ItemInfo {
         font-size: 14px;
         line-height: 19px;
         font-weight: 600;
-        color: var(--pv-ink, #1d1d1f);
+        color: var(--pv-ink, #18181b);
       }
 
       .name a {
@@ -139,9 +139,9 @@ class WrRecCollInfo extends ItemInfo {
         flex: none;
         fill: none;
         stroke: currentColor;
-        stroke-width: 1.5;
-        stroke-linecap: square;
-        stroke-linejoin: miter;
+        stroke-width: 1.6;
+        stroke-linecap: round;
+        stroke-linejoin: round;
       }
 
       .button-row {

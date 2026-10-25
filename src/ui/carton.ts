@@ -1,54 +1,58 @@
-// K5 Graphite for the local library (PV-207). The library is built from
+// Carton for the local library (PV-588). The library is built from
 // ReplayWeb.page components styled with Bulma, each in its own shadow root,
 // so one layer of overrides is added to every one of them rather than
 // rewriting their markup.
 import { css } from "replaywebpage";
 import type { CSSResult } from "lit";
 
-export const graphite: CSSResult = css`
+export const carton: CSSResult = css`
   :host {
-    --pv-ink: #1d1d1f;
-    --pv-ink2: #3a3a3c;
-    --pv-muted: #56565b;
-    --pv-icon-muted: #86868b;
-    --pv-accent: #48484a;
-    --pv-fill: rgba(118, 118, 128, 0.12);
-    --pv-fill2: rgba(118, 118, 128, 0.08);
-    --pv-line: rgba(0, 0, 0, 0.08);
-    --pv-card-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04), 0 18px 40px -22px rgba(0, 0, 0, 0.22);
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Geist", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --pv-ink: #18181b;
+    --pv-ink2: #3f3f46;
+    --pv-muted: #6b6b76;
+    --pv-icon-muted: #71717a;
+    --pv-accent: #5651d8;
+    --pv-accent-hi: #6460e0;
+    --pv-accent-ink: #4b45c6;
+    --pv-top: #fafafb;
+    --pv-fill: #f2f2f5;
+    --pv-fill2: #f5f5f7;
+    --pv-hover: #f7f7f9;
+    --pv-line: #e9e9ee;
+    --pv-edge: #e4e4e9;
+    --pv-red: #c2410c;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
     color: var(--pv-ink);
-    letter-spacing: -0.006em;
     -webkit-font-smoothing: antialiased;
   }
 
   a {
-    color: var(--pv-ink);
+    color: var(--pv-accent-ink);
   }
 
   a:hover {
-    color: var(--pv-ink2);
+    color: var(--pv-accent);
   }
 
   .content h3,
   .content h4,
   .modal-card-title,
   .panel-heading {
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Geist", system-ui, sans-serif;
-    letter-spacing: -0.02em;
+    font-family: inherit;
+    letter-spacing: -0.005em;
   }
 
-  /* Buttons: option I. Secondary by default, graphite for the main action. */
+  /* Buttons: flat, 8px corners. White with an edge by default, indigo for the main action. */
   .button {
     height: 36px;
     padding: 0 14px;
     border: 0;
-    border-radius: 7px;
+    border-radius: 8px;
     font-size: 14px;
-    font-weight: 560;
+    font-weight: 500;
     color: var(--pv-ink);
-    background: linear-gradient(180deg, #fff 0%, #f8f8f9 100%);
-    box-shadow: inset 0 0 0 1px rgba(29, 29, 31, 0.28), 0 1px 1px rgba(0, 0, 0, 0.04);
+    background: #fff;
+    box-shadow: 0 0 0 1px var(--pv-edge);
   }
 
   .button.is-small {
@@ -58,14 +62,14 @@ export const graphite: CSSResult = css`
 
   .button,
   .button.is-small {
-    border-radius: 7px !important;
+    border-radius: 8px !important;
   }
 
   .button:hover,
   .button.is-hovered {
     color: var(--pv-ink);
-    background: #f1f1f3;
-    box-shadow: inset 0 0 0 1px rgba(29, 29, 31, 0.36), 0 1px 1px rgba(0, 0, 0, 0.04);
+    background: var(--pv-hover);
+    box-shadow: 0 0 0 1px var(--pv-edge);
   }
 
   .button:focus-visible,
@@ -78,12 +82,12 @@ export const graphite: CSSResult = css`
   }
 
   .button:focus:not(:focus-visible) {
-    box-shadow: inset 0 0 0 1px rgba(29, 29, 31, 0.28), 0 1px 1px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 0 0 1px var(--pv-edge);
   }
 
   .button[disabled] {
     opacity: 0.45;
-    box-shadow: inset 0 0 0 1px rgba(29, 29, 31, 0.2);
+    box-shadow: 0 0 0 1px var(--pv-edge);
   }
 
   .button .icon,
@@ -99,31 +103,34 @@ export const graphite: CSSResult = css`
   .button.is-link:hover,
   .button.is-link.is-outlined,
   .button.is-link.is-outlined:hover,
-  .button.is-primary[disabled] {
+  .button.is-primary[disabled],
+  .button.is-primary:focus:not(:focus-visible),
+  .button.is-link:focus:not(:focus-visible) {
     color: #fff;
-    background: linear-gradient(180deg, #333336 0%, #1d1d1f 60%, #18181a 100%);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 0 0 0.5px #000, 0 1px 3px -1px rgba(0, 0, 0, 0.25);
+    background: var(--pv-accent);
+    box-shadow: none;
   }
 
   .button.is-primary:hover,
   .button.is-link:hover {
-    background: linear-gradient(180deg, #3a3a3d 0%, #262628 60%, #1d1d1f 100%);
+    background: var(--pv-accent-hi);
   }
 
-  .button.is-primary .icon,
-  .button.is-link .icon {
-    width: 36px;
-    height: 36px;
-    margin-left: -14px !important;
-    margin-right: 10px !important;
-    box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.2);
+  .button.is-primary:focus,
+  .button.is-primary:active,
+  .button.is-primary.is-active,
+  .button.is-link:focus,
+  .button.is-link:active {
+    /* Bulma's own focus rules are more specific and carry ReplayWeb.page's green. */
+    color: #fff !important;
+    background: var(--pv-accent) !important;
   }
 
   .button.is-danger,
   .button.is-danger:hover {
     color: #fff;
-    background: linear-gradient(180deg, #e5484d 0%, #b42318 100%);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 0 0 0.5px #8c1c13;
+    background: var(--pv-red);
+    box-shadow: none;
   }
 
   .button.is-warning,
@@ -131,8 +138,8 @@ export const graphite: CSSResult = css`
   .button.is-warning:hover,
   .button.is-light:hover {
     color: var(--pv-ink);
-    background: linear-gradient(180deg, #f4f4f6 0%, #ededf0 100%);
-    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+    background: var(--pv-fill2);
+    box-shadow: none;
   }
 
   .button.is-loading::after {
@@ -144,7 +151,8 @@ export const graphite: CSSResult = css`
     height: 28px;
     max-width: 28px;
     max-height: 28px;
-    background: var(--pv-fill);
+    border-radius: 8px;
+    background: var(--pv-fill2);
   }
 
   .delete::before,
@@ -153,20 +161,20 @@ export const graphite: CSSResult = css`
   }
 
   .delete:hover {
-    background: rgba(118, 118, 128, 0.2);
+    background: var(--pv-fill);
   }
 
-  /* Fields */
+/* Fields */
   .input,
   .textarea,
   .select select {
-    height: 44px;
+    height: 40px;
     border: 0;
-    border-radius: 9px;
-    background: var(--pv-fill2);
+    border-radius: 8px;
+    background: #fff;
     color: var(--pv-ink);
-    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
-    font-size: 14.5px;
+    box-shadow: 0 0 0 1px var(--pv-edge);
+    font-size: 14px;
   }
 
   .select.is-small,
@@ -174,20 +182,20 @@ export const graphite: CSSResult = css`
   .is-small .select select {
     height: 34px;
     font-size: 13.5px;
-    border-radius: 7px;
+    border-radius: 8px;
   }
 
   .input.is-small {
     height: 34px;
     font-size: 13.5px;
-    border-radius: 7px;
+    border-radius: 8px;
   }
 
   .input:focus,
   .textarea:focus,
   .select select:focus {
     background: #fff;
-    box-shadow: inset 0 0 0 1.5px var(--pv-accent);
+    box-shadow: 0 0 0 1.5px var(--pv-accent);
   }
 
   .input::placeholder {
@@ -200,18 +208,18 @@ export const graphite: CSSResult = css`
 
   .field.has-addons .control:not(:first-child):not(:last-child) .input,
   .field.has-addons .control:first-child:not(:only-child) .input {
-    border-radius: 9px 0 0 9px;
+    border-radius: 8px 0 0 8px;
   }
 
   .field.has-addons .control:last-child:not(:only-child) .button {
-    height: 44px;
-    border-radius: 0 9px 9px 0;
+    height: 40px;
+    border-radius: 0 8px 8px 0;
   }
 
   .label,
   label.label {
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 500;
     color: var(--pv-ink2);
   }
 
@@ -221,26 +229,26 @@ export const graphite: CSSResult = css`
   }
 
   input[type="checkbox"] {
-    accent-color: var(--pv-ink);
+    accent-color: var(--pv-accent);
   }
 
   /* Cards */
   .panel {
     overflow: hidden;
-    border-radius: 16px;
-    background: rgba(255, 255, 255, 0.92);
-    box-shadow: var(--pv-card-shadow);
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 0 0 1px var(--pv-line);
   }
 
   .panel-heading,
   .panel-color {
     padding: 20px 20px 10px;
     border: 0;
-    border-radius: 16px 16px 0 0;
+    border-radius: 10px 10px 0 0;
     background: transparent !important;
     color: var(--pv-ink);
     font-size: 17px !important;
-    font-weight: 700;
+    font-weight: 600;
   }
 
   .panel-block {
@@ -251,7 +259,7 @@ export const graphite: CSSResult = css`
 
   .panel-block:not(:last-child),
   .panel-tabs:not(:last-child) {
-    border-bottom: 0.5px solid var(--pv-line);
+    border-bottom: 1px solid var(--pv-line);
   }
 
   .message,
@@ -263,16 +271,17 @@ export const graphite: CSSResult = css`
   }
 
   .notification {
-    border-radius: 12px;
+    border-radius: 8px;
     background: var(--pv-fill2);
     color: var(--pv-ink2);
   }
 
+  /* Tags keep 6px corners; Carton has no round capsules. */
   .tag {
-    border-radius: 999px;
-    background: var(--pv-fill);
+    border-radius: 6px;
+    background: var(--pv-fill2);
     color: var(--pv-ink2);
-    font-weight: 600;
+    font-weight: 500;
   }
 
   .tabs a {
@@ -281,24 +290,23 @@ export const graphite: CSSResult = css`
   }
 
   .tabs li.is-active a {
-    color: var(--pv-ink);
-    border-bottom: 2px solid var(--pv-ink);
-    font-weight: 600;
+    color: var(--pv-accent-ink);
+    border-bottom: 2px solid var(--pv-accent);
+    font-weight: 500;
   }
 
   .tabs ul {
-    border-bottom-color: rgba(0, 0, 0, 0.12);
+    border-bottom-color: var(--pv-line);
   }
 
   /* Dialogs */
   .modal-background {
-    background: rgba(28, 28, 30, 0.32);
-    backdrop-filter: blur(6px);
+    background: rgba(24, 24, 27, 0.32);
   }
 
   .modal-card {
     border-radius: 20px;
-    box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.45), 0 0 0 0.5px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 24px 64px -20px rgba(24, 24, 27, 0.35), 0 0 0 1px var(--pv-line);
   }
 
   .modal-card-head,
@@ -319,16 +327,46 @@ export const graphite: CSSResult = css`
   }
 
   .modal-card-title {
-    font-size: 22px;
-    font-weight: 700;
+    font-size: 20px;
+    font-weight: 600;
     color: var(--pv-ink);
+  }
+
+  /* The loader shows a Carton spinner, not ReplayWeb.page's own logo. */
+  fa-icon[aria-label="ReplayWeb.page Logo"] {
+    display: none;
+  }
+
+  .is-justify-content-center:has(> fa-icon[aria-label="ReplayWeb.page Logo"])::before {
+    content: "";
+    width: 28px;
+    height: 28px;
+    margin-bottom: 16px;
+    border: 2.5px solid var(--pv-edge);
+    border-top-color: var(--pv-accent);
+    border-radius: 50%;
+    animation: pv-spin 0.9s linear infinite;
+  }
+
+  @keyframes pv-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  progress.progress::-webkit-progress-bar {
+    background: var(--pv-fill);
+  }
+
+  progress.progress::-webkit-progress-value {
+    background: var(--pv-accent);
   }
 `;
 
-/** Adds the graphite layer to a ReplayWeb.page component we do not own. */
+/** Adds the Carton layer to a ReplayWeb.page component we do not own. */
 export function themeElement(tag: string) {
   const ctor = customElements.get(tag) as unknown as { elementStyles?: unknown[] } | undefined;
-  if (ctor?.elementStyles && !ctor.elementStyles.includes(graphite)) {
-    ctor.elementStyles = [...ctor.elementStyles, graphite];
+  if (ctor?.elementStyles && !ctor.elementStyles.includes(carton)) {
+    ctor.elementStyles = [...ctor.elementStyles, carton];
   }
 }

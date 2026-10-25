@@ -26,7 +26,7 @@ export class WrRecCollIndex extends ItemIndex {
       super.styles,
       css`
         .section.no-top-padding {
-          width: calc(100% - 32px);
+          width: calc(100% - 64px);
           max-width: 1180px;
           margin: 0 auto;
           padding: 12px 0 32px;
@@ -70,9 +70,8 @@ export class WrRecCollIndex extends ItemIndex {
           align-items: center;
           justify-content: center;
           border-radius: 12px;
-          color: var(--pv-ink);
-          background: linear-gradient(180deg, #fff 0%, #f2f2f5 100%);
-          box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.1), inset 0 1px 0 #fff, 0 8px 18px -10px rgba(0, 0, 0, 0.3);
+          color: #fff;
+          background: var(--pv-accent);
         }
 
         .sort-header .control.has-icons-left .icon {
@@ -93,9 +92,9 @@ export class WrRecCollIndex extends ItemIndex {
         .ic {
           fill: none;
           stroke: currentColor;
-          stroke-width: 1.5;
-          stroke-linecap: square;
-          stroke-linejoin: miter;
+          stroke-width: 1.6;
+          stroke-linecap: round;
+          stroke-linejoin: round;
         }
       `,
     ];
