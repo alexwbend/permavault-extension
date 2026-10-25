@@ -52,25 +52,25 @@ class WrRecColl extends Item {
       }
 
       .button.is-primary-new {
-        background-color: #4d7c0f;
+        background-color: #5651d8;
         border-color: rgba(0, 0, 0, 0);
         color: rgb(255, 255, 255);
-        border-radius: 6px;
+        border-radius: 8px;
       }
 
       .button.is-primary-new:hover {
-        background-color: #3a5f09;
+        background-color: #6460e0;
       }
 
       .size-label {
         margin-left: 0.5em;
-        font-weight: bold;
+        font-weight: 600;
       }
 
       .dot {
         height: 8px;
         width: 8px;
-        background-color: #16a34a;
+        background-color: #1f8a4c;
         border-radius: 50%;
         display: inline-block;
       }

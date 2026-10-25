@@ -13,7 +13,7 @@ import "./coll-index";
 
 import { BtrixClient } from "./upload";
 import type { PropertyValues } from "lit";
-import { graphite, themeElement } from "./graphite";
+import { carton, themeElement } from "./carton";
 import { icon } from "../icons";
 import { VAULT_HOME } from "../pv/auth";
 
@@ -36,7 +36,7 @@ const DEFAULT_GATEWAY_URL = "https://w3s.link/ipfs/";
 
 const DEFAULT_BTRIX_URL = "https://app.browsertrix.com";
 
-// Every ReplayWeb.page part of the library takes the graphite layer too.
+// Every ReplayWeb.page part of the library takes the Carton layer too.
 for (const tag of ["wr-modal", "wr-item", "wr-item-index", "wr-item-info", "wr-loader", "wr-coll-replay", "wr-coll-resources", "wr-page-view", "wr-page-entry", "wr-gdrive", "wr-chooser", "wr-sorter", "wr-rec-coll", "wr-rec-coll-info", "wr-rec-coll-index", "wr-btrix-upload", "archive-web-page"]) {
   themeElement(tag);
 }
@@ -369,7 +369,7 @@ class ArchiveWebApp extends ReplayWebApp {
   }
 
   static get styles() {
-    return [wrapCss(ArchiveWebApp.appStyles), graphite];
+    return [wrapCss(ArchiveWebApp.appStyles), carton];
   }
 
   static get appStyles() {
@@ -389,7 +389,7 @@ class ArchiveWebApp extends ReplayWebApp {
       }
 
       .recorder .modal-card-head {
-        background-color: #97a1ff;
+        background-color: #fff;
       }
 
       .extra-padding {
@@ -446,27 +446,23 @@ class ArchiveWebApp extends ReplayWebApp {
       ${ReplayWebApp.appStyles}
 
       :host {
-        background:
-          radial-gradient(70% 55% at 100% 0%, rgba(199, 201, 209, 0.55) 0%, rgba(199, 201, 209, 0) 70%),
-          radial-gradient(60% 50% at 0% 0%, rgba(218, 219, 224, 0.45) 0%, rgba(218, 219, 224, 0) 70%),
-          linear-gradient(180deg, #e3e4e8 0%, #eff0f2 42%, #f5f5f7 100%);
+        background: #fff;
       }
 
+      /* Carton: a full-width quiet top bar with a hairline, logo at the left. */
       .navbar {
-        width: calc(100% - 32px);
-        max-width: 1180px;
-        height: 56px;
-        min-height: 56px;
-        margin: 16px auto 0;
-        padding: 0 16px;
-        border-radius: 16px;
-        background: rgba(255, 255, 255, 0.72);
-        backdrop-filter: blur(40px) saturate(1.8);
-        box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.09), inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 10px 24px -16px rgba(0, 0, 0, 0.3);
+        width: 100%;
+        height: 64px;
+        min-height: 64px;
+        margin: 0;
+        padding: 0 48px;
+        border-radius: 0;
+        background: var(--pv-top);
+        box-shadow: inset 0 -1px 0 var(--pv-line);
       }
 
       .navbar-brand {
-        height: 56px;
+        height: 64px;
         gap: 12px;
       }
 
@@ -488,7 +484,7 @@ class ArchiveWebApp extends ReplayWebApp {
       a.navbar-item:hover,
       a.navbar-item:focus-visible {
         color: var(--pv-ink);
-        background: var(--pv-fill2);
+        background: var(--pv-fill);
       }
 
       .navbar-item .ic,
@@ -498,28 +494,31 @@ class ArchiveWebApp extends ReplayWebApp {
 
       .brand-logo {
         display: block;
-        height: 18px;
+        height: 26px;
+        max-height: none;
         width: auto;
       }
 
+      /* A 6px-corner tag, never a round capsule. */
       .lib-chip {
         height: 24px;
-        padding: 0 10px;
+        margin-left: 12px;
+        padding: 0 8px;
         display: inline-flex;
         align-items: center;
-        border-radius: 999px;
-        background: var(--pv-fill);
+        border-radius: 6px;
+        background: var(--pv-fill2);
         color: var(--pv-ink2);
-        font-size: 13px;
-        font-weight: 600;
+        font-size: 12.5px;
+        font-weight: 500;
         white-space: nowrap;
       }
 
       .section.less-padding {
-        width: calc(100% - 32px);
+        width: calc(100% - 64px);
         max-width: 1180px;
         margin: 0 auto;
-        padding: 22px 0 6px;
+        padding: 28px 0 6px;
       }
 
       .section.less-padding .message-body {
@@ -563,13 +562,9 @@ class ArchiveWebApp extends ReplayWebApp {
         flex: none;
         fill: none;
         stroke: currentColor;
-        stroke-width: 1.5;
-        stroke-linecap: square;
-        stroke-linejoin: miter;
-      }
-
-      .ic.small {
-        stroke-width: 1.75;
+        stroke-width: 1.6;
+        stroke-linecap: round;
+        stroke-linejoin: round;
       }
 
       .about-mark {
@@ -579,9 +574,9 @@ class ArchiveWebApp extends ReplayWebApp {
         display: flex;
         align-items: center;
         justify-content: center;
-        border-radius: 13px;
+        border-radius: 12px;
         color: #fff;
-        background: linear-gradient(180deg, #5a5a5d 0%, #2c2c2e 100%);
+        background: var(--pv-accent);
       }
 
       .about-mark fa-icon {

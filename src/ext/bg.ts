@@ -32,7 +32,7 @@ const disabledCSPTabs = new Set();
 // ===========================================================================
 
 function main() {
-  chrome.action.setBadgeBackgroundColor({ color: "#4d7c0f" });
+  chrome.action.setBadgeBackgroundColor({ color: "#5651d8" });
 
   chrome.contextMenus.create({
     id: "toggle-rec",

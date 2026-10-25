@@ -1,13 +1,14 @@
 # Extension brand assets
 
-The vectors follow Permavault's locked K5 Graphite design (PV-207). The mark's
+The vectors follow Permavault's locked Carton design (PV-588). The mark's
 paths come from the main repository's `brand/` directory; keep them and their
 proportions unchanged.
 
 - `icon.svg`, `icon-48.svg`, `icon-32.svg`, `icon-16.svg`: the production
-  toolbar icon, a graphite square (`#5A5A5D` to `#2C2C2E`) with a white mark.
+  toolbar icon, a flat Carton indigo square (`#5651D8`) with a white mark.
   The mark sits closer to the edge at 16 and 32 px so it stays legible.
-- `icon-dev.svg`: the purple development icon with a white mark.
+- `icon-dev.svg`: the amber (`#B45309`) development icon with a white mark,
+  so a test build never looks like the release.
 - `permavault-logo.svg`: `brand/logo/permavault-logo-mono.svg`, the symbol and
   wordmark shown in the popup header.
 - `permavault-mark.svg`: `brand/symbol/permavault-symbol-mono.svg`.
