@@ -22,7 +22,7 @@ import {
 
 import { getBalance, uploadWacz, openWsForJob, getCaptureJob, makePermanent } from "./pv/api";
 
-import { loadPending, savePending, clearPending, type LargeCaptureState } from "./pv/pending";
+import { loadPending, savePending, clearPending, type CaptureOutcome, type LargeCaptureState } from "./pv/pending";
 
 import { startEmailGrant, loadEmailGrant, exchangeEmailGrant, type EmailGrant } from "./pv/extensionAuth";
 import { quoteLargeCapture, checkoutLargeCapture, coveringLargePayment, largeCheckoutState, uploadLargeCapture, ServerRefusal, PAYMENT_GONE } from "./pv/largeCapture";
@@ -84,6 +84,18 @@ export function temporaryLine(expiry: Date, now = Date.now()): string {
   return `Temporary · ${left} left, until ${moment}`;
 }
 
+/**
+ * A confirmed outcome a reopened popup may show again. A temporary save is
+ * shown only until its expiry; after that only History knows what happened.
+ */
+export function restorableOutcome(outcome: CaptureOutcome | undefined, now = Date.now()): CaptureOutcome | null {
+  if (!outcome) return null;
+  if (outcome.kind === "vault" || outcome.kind === "existing") return outcome;
+  if (outcome.kind !== "staged" || !outcome.uploadId || !outcome.stagedExpiresAt) return null;
+  const expiry = serverExpiryDate(outcome.stagedExpiresAt);
+  return expiry && expiry.getTime() > now ? outcome : null;
+}
+
 // ===========================================================================
 class PermavaultPopup extends LitElement {
   // Type-space declarations for Lit reactive props and internals (the
@@ -126,6 +138,7 @@ class PermavaultPopup extends LitElement {
   declare uploadStage: string;
   declare doneKind: string;
   declare uploadId: string;
+  declare uploadJobId: string;
   declare errorMsg: string;
   declare port: any;
   declare tabId: number;
@@ -191,6 +204,7 @@ class PermavaultPopup extends LitElement {
     this.uploadStage = "";
     this.doneKind = "";
     this.uploadId = "";
+    this.uploadJobId = "";
     this.errorMsg = "";
 
     // non-reactive internals
@@ -296,7 +310,21 @@ class PermavaultPopup extends LitElement {
           this.privateSelected = true;
           this.privateArticle = { ...pending.privateArticle, blob: pending.blob, filename: pending.filename };
         }
-        if (pending.submitted && !pending.large && !this.pendingAccountMismatch) {
+        const outcome = pending.submitted && !this.pendingAccountMismatch ? restorableOutcome(pending.outcome) : null;
+        if (outcome) {
+          // The server already confirmed this save: show that, not "Check History".
+          this.uploadId = outcome.uploadId || "";
+          this.stagedExpiresAt = outcome.stagedExpiresAt || "";
+          this.doneKind = outcome.kind;
+          this.phase = "done";
+        } else if (pending.submitted && !pending.large && !this.pendingAccountMismatch && pending.jobId) {
+          // Accepted but not confirmed while the popup was open: keep following it.
+          this.uploadJobId = pending.jobId;
+          this.uploadPercent = null;
+          this.uploadStage = "processing";
+          this.phase = "uploading";
+          void this.trackUploadJob(pending.jobId);
+        } else if (pending.submitted && !pending.large && !this.pendingAccountMismatch) {
           this.doneKind = "finishing";
           this.phase = "done";
         } else {
@@ -717,12 +745,22 @@ class PermavaultPopup extends LitElement {
     await savePending({ blob: this.waczBlob, filename: this.waczFilename,
       sourceUrl: this.sourceUrl, screenshotDataUrl: this.screenshotDataUrl,
       account: this.pendingAccount, submitted, ...(this.largeState ? { large: this.largeState } : {}),
+      ...(submitted && this.uploadJobId ? { jobId: this.uploadJobId } : {}),
+      ...(submitted && this.confirmedOutcome ? { outcome: this.confirmedOutcome } : {}),
       ...(this.privateArticle ? { privateArticle: {
         vaultId: this.privateArticle.vaultId, recipient: this.privateArticle.recipient,
         plaintextSize: this.privateArticle.plaintextSize,
         sealedManifest: this.privateArticle.sealedManifest, anchorSha256: this.privateArticle.anchorSha256,
         operationId: this.privateArticle.operationId,
       } } : {}) });
+  }
+
+  /** The outcome the server confirmed for this package, if any. */
+  get confirmedOutcome(): CaptureOutcome | null {
+    if (this.phase !== "done") return null;
+    if (this.doneKind === "staged") return this.uploadId ? { kind: "staged", uploadId: this.uploadId, stagedExpiresAt: this.stagedExpiresAt } : null;
+    if (this.doneKind === "vault" || this.doneKind === "existing") return { kind: this.doneKind, ...(this.uploadId ? { uploadId: this.uploadId } : {}) };
+    return null;
   }
 
   /**
@@ -903,6 +941,9 @@ class PermavaultPopup extends LitElement {
     const { status, json } = result;
 
     if (status === 202 && json?.jobId) {
+      this.uploadJobId = json.jobId;
+      // A reopened popup keeps following this job instead of guessing.
+      void this.persistPending(true).catch(() => {});
       this.trackUploadJob(json.jobId);
       return;
     }
@@ -1063,7 +1104,9 @@ class PermavaultPopup extends LitElement {
     this.doneKind = data.staged === true ? "staged"
       : data.txId ? (data.alreadyArchived === true ? "existing" : "vault") : "finishing";
     this.phase = "done";
-    // Keep the bytes until the user explicitly moves on, including uncertain outcomes.
+    // Keep the bytes until the user explicitly moves on, including uncertain
+    // outcomes, and remember a confirmed outcome so a reopened popup shows it.
+    if (this.confirmedOutcome && this.waczBlob) void this.persistPending(true).catch(() => {});
   }
 
   async onMakePermanent() {
@@ -1161,6 +1204,7 @@ class PermavaultPopup extends LitElement {
     this.sourceUrl = "";
     this.screenshotDataUrl = null;
     this.uploadId = "";
+    this.uploadJobId = "";
     this.doneKind = "";
     this.uploadPercent = null;
     this.uploadStage = "";

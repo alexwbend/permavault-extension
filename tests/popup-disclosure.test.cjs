@@ -501,6 +501,57 @@ test('reopening after submission asks for status check instead of duplicate uplo
   assert.equal(h.uploads(), 0);
 });
 
+test('reopening after a confirmed temporary save shows that save, not "Check History"', async () => {
+  const h = popup();
+  const expiry = new Date(Date.now() + 7 * 864e5).toISOString();
+  h.instance.waczBlob = new Blob(['exact package']);
+  h.instance.destinationAccepted = true;
+  await h.instance.uploadCapture();
+  assert.equal(h.pending().jobId, 'job');
+  h.handlers().onComplete({ uploadId: 'save', staged: true, stagedExpiresAt: expiry });
+  await new Promise(setImmediate);
+  assert.deepEqual({ ...h.pending().outcome }, { kind: 'staged', uploadId: 'save', stagedExpiresAt: expiry });
+  h.instance.closeJobChannel();
+  Object.assign(h.instance, { phase: 'idle', doneKind: '', uploadId: '', stagedExpiresAt: '', waczBlob: null });
+  await h.instance.initSession();
+  assert.equal(h.instance.phase, 'done');
+  assert.equal(h.instance.doneKind, 'staged');
+  assert.equal(h.instance.uploadId, 'save');
+  assert.match(h.instance.renderDone(), /Saved free for 7 days/);
+  assert.doesNotMatch(h.instance.renderDone(), /Check History for the result/);
+  assert.equal(h.uploads(), 1);
+});
+
+test('a reopened temporary save past its expiry only points to History', async () => {
+  const h = popup();
+  h.setPending({ blob: new Blob(['p']), filename: 'p.wacz', sourceUrl: '', account: 'account', submitted: true,
+    outcome: { kind: 'staged', uploadId: 'save', stagedExpiresAt: '2020-01-01T00:00:00Z' } });
+  await h.instance.initSession();
+  assert.equal(h.instance.doneKind, 'finishing');
+  assert.match(h.instance.renderDone(), /Check History for the result/);
+});
+
+test('a reopened popup keeps following an accepted upload and shows its result', async () => {
+  const h = popup();
+  h.setPending({ blob: new Blob(['p']), filename: 'p.wacz', sourceUrl: '', account: 'account', submitted: true, jobId: 'job' });
+  await h.instance.initSession();
+  assert.equal(h.instance.phase, 'uploading');
+  await new Promise(setImmediate);
+  h.handlers().onComplete({ uploadId: 'save', txId: 'tx' });
+  assert.equal(h.instance.doneKind, 'vault');
+  assert.match(h.instance.renderDone(), /Sent to permanent storage/);
+  assert.equal(h.uploads(), 0);
+});
+
+test('another account never sees the restored outcome of a sent package', async () => {
+  const h = popup();
+  h.setPending({ blob: new Blob(['p']), filename: 'p.wacz', sourceUrl: '', account: 'someone-else', submitted: true,
+    outcome: { kind: 'vault', uploadId: 'save' } });
+  await h.instance.initSession();
+  assert.equal(h.instance.phase, 'review-capture');
+  assert.equal(h.instance.uploadId, '');
+});
+
 test('signed-out recording resumes after popup reopening and packages locally', async () => {
   const h = popup();
   h.setSession(null);

@@ -10,8 +10,18 @@ export type PendingCapture = {
   screenshotDataUrl: string | null;
   account: string;
   submitted?: boolean;
+  /** The upload job, so a reopened popup can keep following it. */
+  jobId?: string;
+  /** What the server confirmed, so a reopened popup shows it instead of "Check History". */
+  outcome?: CaptureOutcome;
   large?: LargeCaptureState;
   privateArticle?: Omit<LockedArticle, "blob" | "filename">;
+};
+
+export type CaptureOutcome = {
+  kind: "staged" | "vault" | "existing";
+  uploadId?: string;
+  stagedExpiresAt?: string;
 };
 
 export type LargeCaptureState = {
