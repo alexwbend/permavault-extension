@@ -1,3 +1,12 @@
+<p align="center">
+  <a href="https://permavault.xyz">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="assets/readme-logo-white.svg" />
+      <img src="assets/readme-logo-ink.svg" width="380" alt="Permavault" />
+    </picture>
+  </a>
+</p>
+
 # Permavault Browser Extension
 
 **Capture it before it changes or disappears.**

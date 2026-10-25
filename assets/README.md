@@ -13,6 +13,7 @@ proportions unchanged.
 - `permavault-logo.svg`: `brand/logo/permavault-logo-mono.svg`, the symbol and
   wordmark shown in the popup header.
 - `permavault-mark.svg`: `brand/symbol/permavault-symbol-mono.svg`.
+- `readme-logo-ink.svg` and `readme-logo-white.svg`: the main repository's `brand/logo/permavault-logo-ink.svg` and `permavault-logo-white.svg`, shown at the top of this README (the white one in GitHub's dark mode). Not part of the extension build.
 
 The extension build copies `static/`, so regenerate the shipped files whenever
 these vectors change. Use Node 22 and an existing Sharp installation; Sharp is
