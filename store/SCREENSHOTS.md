@@ -13,8 +13,8 @@ Upload in this order. Every file is RGB PNG at the exact size the Store asks for
 | `marquee.png` | 1400×560 | Keep the web pages your work depends on. |
 | `icon.png` | 128×128 (96 px artwork, transparent padding) | Store icon |
 
-The set uses the graphite redesign (chosen by Alex on 24 Oct 2026, PV-207). Its popup is the redesigned popup with the decided wording from PR #9, and screenshot 2 shows the redesigned web app. Alex chose to upload it before the extension and the app are restyled, accepting that the images show a look the installed extension does not have yet and that Google may reject the listing update for that reason. The store icon is the graphite icon; the package icon in `assets/` changes with the restyle.
+The set uses the Carton design (PV-582, approved by Alex on 25 Oct 2026). Its popups are screenshots of the shipped Carton extension, version 0.2.6, and screenshot 2 is the real Carton web app. The Private screenshot, the small promo tile and the store icon use Night navy, matching the toolbar icon Alex chose (PV-588). The headlines are the set Alex picked on 24 Oct 2026, unchanged. Not uploaded yet: the Store listing still shows the graphite set until the next submission (PV-207).
 
-The sample page is fictional (The Riverton Ledger, `rivertonledger.example`). Editable sources: the main project's private `internal/design/row-P/` (`build_PF.py`), and the "Chrome Web Store" page of the Design canvas.
+The sample page is fictional (The Riverton Ledger, `rivertonledger.example`). In screenshot 2 the capture appears as a PDF of that article. Editable sources: the main project's private `internal/design/row-P/` (`build_PC.py`, `carton-src/`, `tools/export_pc.mjs`).
 
 These images do not replace installed-release acceptance tests. Submission, approval and public availability must be verified separately in the publisher console.
