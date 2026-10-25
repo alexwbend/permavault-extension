@@ -5,7 +5,8 @@ paths come from the main repository's `brand/` directory; keep them and their
 proportions unchanged.
 
 - `icon.svg`, `icon-48.svg`, `icon-32.svg`, `icon-16.svg`: the production
-  toolbar icon, a flat Carton indigo square (`#5651D8`) with a white mark.
+  toolbar icon, a Night navy square (`#232D6F` to `#131A48`, the Private
+  blue, chosen by Alex on 25 Oct 2026) with a white mark.
   The mark sits closer to the edge at 16 and 32 px so it stays legible.
 - `icon-dev.svg`: the amber (`#B45309`) development icon with a white mark,
   so a test build never looks like the release.

@@ -255,8 +255,8 @@ class BrowserRecorder extends Recorder {
       // @ts-expect-error - TS2339 - Property 'behaviorState' does not exist on type 'BrowserRecorder'.
       if (this.behaviorState === BEHAVIOR_RUNNING) {
         title = "Saving this page…";
-        // Near-black, so the dot stays visible on the indigo icon.
-        color = "#18181b";
+        // Indigo, so the dot stays visible on the navy icon.
+        color = "#5651d8";
         text = " ";
         // @ts-expect-error - TS2339 - Property 'numPending' does not exist on type 'BrowserRecorder'.
       } else if (this.numPending === 0) {
